@@ -6,20 +6,20 @@ export interface SubmissionPayload {
   udyam: string;
   gstin: string;
   pan: string;
-  epfoApplicable: boolean;
-  esicApplicable: boolean;
-  startupIndia: boolean;
-  nsic: boolean;
-  oemAuthorization: boolean;
-  localContent: string;
-  tenderRef: string;
+  epfoApplicable?: boolean;
+  esicApplicable?: boolean;
+  startupIndia?: boolean;
+  nsic?: boolean;
+  oemAuthorization?: boolean;
+  localContent?: string;
+  tenderRef?: string;
   attachedDocs: string[];
 }
 
 export interface VerificationResult {
   score: number;
   risk: "Low" | "Medium" | "High";
-  status: "Cleared" | "Flagged" | "Under Review";
+  status: "Under Verification" | "Verified" | "Rejected" | "Documents Requested" | "Cleared" | "Flagged" | "Under Review";
   pending: number;
   checks: {
     id: string;
@@ -37,8 +37,22 @@ interface BidderContextType {
   setActiveTenderId: (id: string) => void;
   lastSubmission: SubmissionPayload | null;
   setLastSubmission: (payload: SubmissionPayload | null) => void;
-  evaluateSubmission: (payload: SubmissionPayload, tender: Tender) => VerificationResult;
+  submittedBidderId: string | null;
+  setSubmittedBidderId: (id: string | null) => void;
+  evaluateSubmission: (payload: SubmissionPayload, tender?: Tender) => VerificationResult;
   registerSubmittedBidder: (payload: SubmissionPayload, result: VerificationResult) => Bidder;
+  registerVendorBid: (payload: { companyName: string; udyam: string; gstin: string; pan: string; attachedDocs: string[] }) => Bidder;
+  completeAiVerification: (
+    bidderId: string,
+    docScores: { id: string; name: string; score: number; status: "verified" | "flagged"; detail?: string }[],
+    complianceScore: number
+  ) => void;
+  updateBidderStatus: (
+    bidderId: string,
+    status: "Verified" | "Rejected" | "Documents Requested" | "Under Verification",
+    feedbackMessage?: string
+  ) => void;
+  getBidderById: (id: string) => Bidder | undefined;
   getAllBidders: (tenderRef?: string) => Bidder[];
   resetBiddersToDefault: () => void;
   clearAllBidders: () => void;
@@ -60,6 +74,10 @@ export function BidderProvider({ children }: { children: React.ReactNode }) {
     return [];
   });
 
+  const [submittedBidderId, setSubmittedBidderId] = useState<string | null>(() => {
+    return sessionStorage.getItem("bidsure_submitted_bidder_id") || null;
+  });
+
   const [lastSubmission, setLastSubmission] = useState<SubmissionPayload | null>(() => {
     const saved = sessionStorage.getItem("bidsure_last_submission");
     if (saved) {
@@ -75,6 +93,14 @@ export function BidderProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     sessionStorage.setItem("bidsure_custom_bidders", JSON.stringify(customBidders));
   }, [customBidders]);
+
+  useEffect(() => {
+    if (submittedBidderId) {
+      sessionStorage.setItem("bidsure_submitted_bidder_id", submittedBidderId);
+    } else {
+      sessionStorage.removeItem("bidsure_submitted_bidder_id");
+    }
+  }, [submittedBidderId]);
 
   useEffect(() => {
     if (lastSubmission) {
@@ -310,13 +336,148 @@ export function BidderProvider({ children }: { children: React.ReactNode }) {
     };
 
     setCustomBidders((prev) => [newBidder, ...prev.filter((b) => b.gstin !== newBidder.gstin)]);
+    setSubmittedBidderId(newBidder.id);
     return newBidder;
+  }
+
+  function registerVendorBid(payload: { companyName: string; udyam: string; gstin: string; pan: string; attachedDocs: string[] }): Bidder {
+    // Explicitly mark as not AI-verified so it lists in Officer Dashboard pending queue
+    const newBidder: Bidder = {
+      id: `bidder-${Date.now()}`,
+      name: payload.companyName,
+      gstin: payload.gstin,
+      score: 92,
+      risk: "Low",
+      status: "Under Verification",
+      pending: 0,
+      lastChecked: "Awaiting Officer Verification",
+      recommendation: "Bid submitted by vendor. Statutory credentials ready for procurement officer verification.",
+      isAiVerified: false,
+      officerDecision: null,
+      submittedAt: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      udyam: payload.udyam,
+      pan: payload.pan,
+      attachedDocsCount: payload.attachedDocs.length,
+      checks: [
+        { label: "Udyam Registration", status: "verified", note: `Udyam ID ${payload.udyam} active on MSME registry.` },
+        { label: "GSTN Registration & Returns", status: "verified", note: `GSTIN ${payload.gstin} regular in GSTR-3B filings.` },
+        { label: "PAN & MCA21 Record", status: "verified", note: `PAN ${payload.pan} verified against CBDT master database.` },
+        { label: "Central Debarment / Incident Check", status: "verified", note: "No adverse debarment or vigilance record found." },
+        { label: "DigiLocker Authenticity", status: "verified", note: `${payload.attachedDocs.length} certificates cryptographically verified.` },
+      ],
+    };
+
+    // Keep all bids by filtering by id so every submitted bid is listed in both vendor and officer portals
+    setCustomBidders((prev) => [newBidder, ...prev.filter((b) => b.id !== newBidder.id)]);
+    setSubmittedBidderId(newBidder.id);
+    return newBidder;
+  }
+
+  function completeAiVerification(
+    bidderId: string,
+    docScores: { id: string; name: string; score: number; status: "verified" | "flagged"; detail?: string }[],
+    complianceScore: number
+  ) {
+    setCustomBidders((prev) => {
+      const existingIndex = prev.findIndex((b) => b.id === bidderId);
+      if (existingIndex >= 0) {
+        const updated = [...prev];
+        updated[existingIndex] = {
+          ...updated[existingIndex],
+          isAiVerified: true,
+          complianceScore,
+          documentScores: docScores,
+          score: complianceScore,
+          lastChecked: "AI Verified just now",
+        };
+        return updated;
+      } else {
+        const base = BASE_BIDDERS.find((b) => b.id === bidderId);
+        if (!base) return prev;
+        const updatedBidder: Bidder = {
+          ...base,
+          isAiVerified: true,
+          complianceScore,
+          documentScores: docScores,
+          score: complianceScore,
+          lastChecked: "AI Verified just now",
+        };
+        return [updatedBidder, ...prev];
+      }
+    });
+  }
+
+  function updateBidderStatus(
+    bidderId: string,
+    status: "Verified" | "Rejected" | "Documents Requested" | "Under Verification",
+    feedbackMessage?: string
+  ) {
+    setCustomBidders((prev) => {
+      const existingIndex = prev.findIndex((b) => b.id === bidderId);
+      if (existingIndex >= 0) {
+        const updated = [...prev];
+        const target = updated[existingIndex];
+        let newScore = target.score;
+        let newRisk = target.risk;
+        if (status === "Verified") {
+          newScore = Math.max(88, target.score);
+          newRisk = "Low";
+        } else if (status === "Rejected") {
+          newScore = Math.min(45, target.score);
+          newRisk = "High";
+        } else if (status === "Documents Requested") {
+          newScore = 65;
+          newRisk = "Medium";
+        }
+
+        updated[existingIndex] = {
+          ...target,
+          status,
+          officerDecision: status,
+          score: newScore,
+          risk: newRisk,
+          lastChecked: "Verified just now",
+          feedbackMessage:
+            feedbackMessage ||
+            (status === "Verified"
+              ? "Bid successfully verified and cleared by the Procurement Officer."
+              : status === "Rejected"
+              ? "Disqualified due to statutory non-compliance or credential mismatch."
+              : "Notice: Procurement Officer has requested updated or missing statutory documents."),
+        };
+        return updated;
+      } else {
+        const base = BASE_BIDDERS.find((b) => b.id === bidderId);
+        if (!base) return prev;
+        const updatedBidder: Bidder = {
+          ...base,
+          status,
+          officerDecision: status,
+          lastChecked: "Verified just now",
+          feedbackMessage:
+            feedbackMessage ||
+            (status === "Verified"
+              ? "Bid successfully verified and cleared by the Procurement Officer."
+              : status === "Rejected"
+              ? "Disqualified due to statutory non-compliance or credential mismatch."
+              : "Notice: Procurement Officer has requested updated or missing statutory documents."),
+        };
+        return [updatedBidder, ...prev];
+      }
+    });
+  }
+
+  function getBidderById(id: string): Bidder | undefined {
+    return getAllBidders().find((b) => b.id === id);
   }
 
   function getAllBidders(tenderRef?: string): Bidder[] {
     const tender = TENDERS.find((t) => t.ref === tenderRef) || TENDERS[0];
-    // Dynamic evaluation for base bidders
-    const evaluatedBase = BASE_BIDDERS.map((baseBidder) => {
+    // Filter base bidders that are already customized
+    const filteredBase = BASE_BIDDERS.filter(
+      (baseBidder) => !customBidders.some((cb) => cb.id === baseBidder.id || cb.gstin === baseBidder.gstin)
+    );
+    const evaluatedBase = filteredBase.map((baseBidder) => {
       const checks = baseBidder.checks.map((c) => ({ ...c }));
       const stats = BIDDER_RAW_STATS[baseBidder.id] || {
         localContent: 50,
@@ -369,7 +530,7 @@ export function BidderProvider({ children }: { children: React.ReactNode }) {
       let score = Math.max(20, baseBidder.score - scorePenalty);
       let pending = baseBidder.pending + tenderFlags;
       let risk: "Low" | "Medium" | "High" = baseBidder.risk;
-      let status: "Cleared" | "Flagged" | "Under Review" = baseBidder.status;
+      let status: "Under Verification" | "Verified" | "Rejected" | "Documents Requested" | "Cleared" | "Flagged" | "Under Review" = baseBidder.status;
       let recommendation = baseBidder.recommendation;
 
       if (tenderFlags > 0) {
@@ -395,12 +556,16 @@ export function BidderProvider({ children }: { children: React.ReactNode }) {
 
   function resetBiddersToDefault() {
     setCustomBidders([]);
+    setSubmittedBidderId(null);
     sessionStorage.removeItem("bidsure_custom_bidders");
+    sessionStorage.removeItem("bidsure_submitted_bidder_id");
   }
 
   function clearAllBidders() {
     setCustomBidders([]);
+    setSubmittedBidderId(null);
     sessionStorage.removeItem("bidsure_custom_bidders");
+    sessionStorage.removeItem("bidsure_submitted_bidder_id");
   }
 
   return (
@@ -411,8 +576,14 @@ export function BidderProvider({ children }: { children: React.ReactNode }) {
         setActiveTenderId,
         lastSubmission,
         setLastSubmission,
+        submittedBidderId,
+        setSubmittedBidderId,
         evaluateSubmission,
         registerSubmittedBidder,
+        registerVendorBid,
+        completeAiVerification,
+        updateBidderStatus,
+        getBidderById,
         getAllBidders,
         resetBiddersToDefault,
         clearAllBidders,

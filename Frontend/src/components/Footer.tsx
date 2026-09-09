@@ -10,11 +10,11 @@ export default function Footer({ dark }: { dark?: boolean }) {
           style={{ backgroundColor: dark ? "#4FA37C" : "#1F7A5C" }}
         />
         <span className="text-xs font-medium" style={{ color: dark ? "#8E9DAE" : "#7A7366" }}>
-          BidSure AI Prototype &middot; Smart India Hackathon &middot; Problem Statement 26100
+          BidSure AI &middot; Government e-Marketplace (GeM) Bid Compliance Platform
         </span>
       </div>
       <span className="text-xs" style={{ color: dark ? "#6C7A88" : "#9B9285" }}>
-        Chennai Petroleum Corporation Limited (CPCL) &middot; Ministry of Petroleum &amp; Natural Gas
+        Integrated Statutory &amp; Regulatory Verification System
       </span>
     </footer>
   );

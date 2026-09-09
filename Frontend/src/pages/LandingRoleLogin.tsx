@@ -33,7 +33,7 @@ export default function LandingRoleLogin() {
           style={{ backgroundColor: "#0F1B2D", color: "#F2EFE9" }}
         >
           <div>
-            <div className="mb-12">
+            <div className="mb-10">
               <span
                 style={{ fontFamily: "'Fraunces', serif", letterSpacing: "0.02em" }}
                 className="text-3xl font-bold block"
@@ -45,20 +45,15 @@ export default function LandingRoleLogin() {
               </span>
             </div>
 
-            <div className="inline-block px-3 py-1 rounded text-xs font-semibold uppercase tracking-wider mb-5" style={{ backgroundColor: "#1C2A3E", color: "#68BA97" }}>
-              SIH 2026 &middot; PS 26100
-            </div>
-
             <h1
               style={{ fontFamily: "'Fraunces', serif" }}
               className="text-3xl lg:text-4xl leading-tight max-w-md font-semibold"
             >
-              Statutory compliance verified before the tender is opened.
+              Every bidder participating in GeM procurement
             </h1>
 
             <p className="mt-5 max-w-sm text-sm leading-relaxed" style={{ color: "#B8C2CE" }}>
-              Every bidder participating in GeM procurement is automatically cross-checked
-              against Udyam, GSTN, Income Tax, EPFO, ESIC, CPPP Debarment, and DigiLocker
+              Cross-checked against Udyam, GSTN, Income Tax, EPFO, ESIC, CPPP Debarment, and DigiLocker
               registries against tender-specific eligibility requirements.
             </p>
 
@@ -81,7 +76,7 @@ export default function LandingRoleLogin() {
 
           <div className="pt-8 mt-8 border-t" style={{ borderColor: "#1F2E42" }}>
             <p className="text-xs leading-relaxed max-w-sm" style={{ color: "#8A96A3" }}>
-              Designed for Chennai Petroleum Corporation Limited (CPCL) &middot; Ministry of Petroleum &amp; Natural Gas.
+              Government e-Marketplace (GeM) Statutory Compliance &amp; Verification Platform.
             </p>
           </div>
         </div>

@@ -1,106 +1,86 @@
-# GeM BidSure — Frontend Client
+# GeM BidSure — AI-Powered Bid Compliance Verification Platform
 
-A high-performance React application for automated public procurement compliance verification and technical bid evaluation on the Government e-Marketplace (GeM).
+An automated public procurement compliance verification and technical bid evaluation platform for the Government e-Marketplace (GeM), governed by GFR 2017 and standard statutory compliance regulations.
 
 ---
 
-## Overview
+## Architecture & User Workflows
 
-GeM BidSure streamlines the technical evaluation and compliance lifecycle for government tenders governed by **GFR 2017** and **GeM Procurement Guidelines**.
+The application connects the **Vendor / Bidder** and **Procurement Officer** through a unified state management layer (`BidderContext`):
 
-The frontend provides specialized workflows tailored to both public vendors and designated procurement officers:
+### 1. Bidder Workflow (`/bidder/submit`)
+- **Navigation Tabs**:
+  - **Submit Tender Bid**: 3-step structured wizard covering Enterprise Credentials (Udyam, GSTIN, PAN), Statutory Document Attachments (Udyam cert, GST certificate, PAN card, ITR acknowledgments), and Final Solemn Declaration.
+  - **Submitted Bids & Status**: Clean, tabular view of all registered bids with live procurement status (`Pending Verification`, `Verified`, `Rejected`, `Documents Requested`) and official Officer Remarks.
+- **Submission Action**:
+  - On submission, the bid is registered with `isAiVerified: false` and `status: "Under Verification"`.
+  - The form clears, and the user is redirected to the clean "Submitted Bids & Status" tab.
+  - Documents are internally routed to the officer queue for verification.
 
-- **Public Tender Discovery (`/`)**: Real-time tender search, parameter inspection, and direct navigation based on organizational role.
-- **Vendor Submission Portal (`/bidder/submit`)**: Guided multi-step bid documentation intake including GSTIN validation, GFR Rule 144(xi) land border declarations, DPIIT Make in India (Class-I / Class-II) local content verification, and technical parameter checklists.
-- **AI Verification Simulator (`/bidder/processing`)**: Real-time stage-by-stage document verification progress with visual feedback.
-- **Bidder Evaluation Report (`/bidder/report/:id`)**: Vendor self-service feedback and compliance breakdown for submitted bids.
-- **Procurement Officer Dashboard (`/officer/dashboard`)**: Centralized bid evaluation matrix displaying real-time risk scores (0–100), flag categorization (High / Medium / Low), Make in India status, land border compliance, and technical parameter deviations.
-- **Audit Trail & Governance (`/officer/audit`)**: Immutable chronological logging of tender parameter modifications, bidder evaluations, and officer actions.
-- **Matrix Export**: Export complete evaluation matrices directly to CSV for tender committee review and official procurement records.
+### 2. Officer Workflow (`/officer/dashboard` & `/officer/verified`)
+- **Pending Verification Queue (`/officer/dashboard`)**:
+  - Displays newly submitted vendor bids awaiting document verification alongside existing tenders.
+  - Procurement officers initiate automated multi-source compliance verification across Udyam, GSTN, CBDT PAN, and DigiLocker databases.
+- **Verified Bidders & Official Determination (`/officer/verified`)**:
+  - Lists all verified bids with overall compliance score (0–100) and risk tier (Low, Medium, High).
+  - Officer can inspect document-level scores and record final official determinations:
+    - **Accept / Verify Bid**: Qualifies the vendor for commercial stage opening.
+    - **Disqualify / Reject**: Disqualifies the bid with recorded statutory discrepancy reasons.
+    - **Request Documents**: Solicits supplementary documents or clarifications.
+- **Live Status Sync**:
+  - Any decision recorded by the officer immediately updates the bidder's status on the vendor side.
 
 ---
 
 ## Tech Stack
 
-- **Framework**: React 19 + TypeScript
-- **Bundler & Dev Server**: Vite
+- **Framework**: React 18+ with TypeScript
+- **Routing**: React Router DOM (v7)
 - **Styling**: Tailwind CSS
 - **Icons**: Lucide React
-- **Animations**: Motion (`motion/react`)
-- **Routing**: React Router v7
+- **Typography**: Google Fonts (*Fraunces* serif & *IBM Plex Sans*)
+- **State Management**: React Context (`BidderContext`, `AuditLogContext`) with `sessionStorage` fallback
 
 ---
 
 ## Project Structure
 
 ```text
-Frontend/
-├── public/                 # Static assets & public resources
-├── src/
-│   ├── components/         # Reusable UI components (Headers, Cards, Badges, Modals)
-│   ├── context/            # React Context providers (TenderContext for global state)
-│   ├── data/               # Mock evaluation datasets & tender rule constants
-│   ├── pages/              # Core application views
-│   │   ├── LandingRoleLogin.tsx          # Public tender discovery & role entry
-│   │   ├── BiddersSubmission.tsx        # Multi-step vendor bid submission
-│   │   ├── AIVerificationProcessing.tsx  # Document verification engine screen
-│   │   ├── BidderReport.tsx              # Detailed vendor compliance breakdown
-│   │   ├── ComplianceDashboard.tsx       # Procurement officer evaluation dashboard
-│   │   └── AuditTrail.tsx                # Compliance event log and audit records
-│   ├── App.tsx             # Route definitions and application shell
-│   ├── index.css           # Tailwind CSS directives and global theme tokens
-│   └── main.tsx            # React application entry point
-├── index.html              # HTML shell
-├── package.json            # Project dependencies and npm scripts
-├── tsconfig.json           # TypeScript configuration
-└── vite.config.ts          # Vite build and plugin configuration
-```
-
----
-
-## Getting Started
-
-### Prerequisites
-- Node.js (v18.0.0 or higher recommended)
-- npm (v9.0.0 or higher)
-
-### Installation
-
-```bash
-# Navigate to the Frontend directory
-cd Frontend
-
-# Install project dependencies
-npm install
-```
-
-### Running Locally
-
-```bash
-# Start the local development server
-npm run dev
-```
-The application will launch at `http://localhost:3000` (or the next available port).
-
-### Production Build
-
-```bash
-# Build optimized static assets into dist/
-npm run build
-
-# Preview the production build locally
-npm run preview
+src/
+├── components/           # UI components (OfficerHeader, Footer, Badges, Icons)
+├── context/
+│   ├── BidderContext.tsx # Central state management for tenders, bids, and officer decisions
+│   └── AuditLogContext.tsx # Audit logs for verification activities
+├── data/
+│   └── bidders.ts        # Data contracts, interfaces, and baseline tender mock data
+├── pages/
+│   ├── LandingRoleLogin.tsx     # Role-based landing portal (Vendor vs. Officer)
+│   ├── BidderSubmission.tsx     # 3-step vendor bid filing + clean submitted bids table
+│   ├── ComplianceDashboard.tsx  # Officer verification dashboard & pending queue
+│   └── VerifiedBidders.tsx      # Officer evaluation matrix & qualification actions
+├── App.tsx               # Route configurations and Context Providers
+├── index.css             # Tailwind CSS tokens
+└── main.tsx              # React entry point
 ```
 
 ---
 
 ## Backend Integration Guide
 
-The frontend is currently architected as a pure client-side SPA with state managed via React Context (`src/context/TenderContext.tsx`). 
+The frontend is fully prepared for backend handoff. Backend engineers can integrate API endpoints at the marked integration points in the codebase:
 
-When connecting to the FastAPI backend (`backend/`):
-1. Configure proxy rules or base URL in `src/` to point to `/api/*`.
-2. Map endpoints to:
-   - `POST /api/bids/submit` (Vendor bid intake & document uploads)
-   - `GET /api/bids/evaluate` (Officer compliance matrix & risk calculations)
-   - `GET /api/audit-logs` (Procurement audit trail)
+### API Endpoints Mapping:
+
+| Endpoint | Method | Component / Context | Purpose |
+|---|---|---|---|
+| `/api/vendor/bids` | `POST` | `BidderSubmission.tsx` (`handleFinalSubmit`) | Submits vendor credentials, statutory IDs, and file attachments. |
+| `/api/vendor/bids` | `GET` | `BidderSubmission.tsx` (`SubmittedBidsTable`) | Fetches all submitted bids and live officer decisions for the vendor. |
+| `/api/officer/bids/pending` | `GET` | `ComplianceDashboard.tsx` | Retrieves all bids currently in queue (`isAiVerified: false`). |
+| `/api/officer/verify` | `POST` | `ComplianceDashboard.tsx` (`completeAiVerification`) | Runs AI verification pipeline across government databases and returns document scores. |
+| `/api/officer/decision` | `POST` | `VerifiedBidders.tsx` (`updateBidderStatus`) | Records officer determination (`Verified`, `Rejected`, `Documents Requested`). |
+
+### Key State Contracts (`src/context/BidderContext.tsx`):
+- `registerVendorBid(payload)`: Creates and queues vendor submission.
+- `completeAiVerification(bidderId, docScores, score)`: Marks AI analysis completed.
+- `updateBidderStatus(bidderId, status, feedbackMessage)`: Updates official decision and reflects on the bidder portal.
+

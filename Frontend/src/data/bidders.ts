@@ -20,24 +20,41 @@ export interface VerificationCheck {
   note?: string;
 }
 
+export interface DocumentScoreItem {
+  id: string;
+  name: string;
+  score: number; // out of 100
+  status: "verified" | "flagged";
+  detail?: string;
+}
+
 export interface Bidder {
   id: string;
   name: string;
   gstin: string;
   score: number;
   risk: "Low" | "Medium" | "High";
-  status: "Cleared" | "Flagged" | "Under Review";
+  status: "Under Verification" | "Verified" | "Rejected" | "Documents Requested" | "Cleared" | "Flagged" | "Under Review";
   pending: number;
   lastChecked: string;
   recommendation: string;
   checks: VerificationCheck[];
+  feedbackMessage?: string;
+  officerDecision?: "Verified" | "Rejected" | "Documents Requested" | "Under Verification" | null;
+  submittedAt?: string;
+  udyam?: string;
+  pan?: string;
+  attachedDocsCount?: number;
+  isAiVerified?: boolean;
+  complianceScore?: number;
+  documentScores?: DocumentScoreItem[];
 }
 
 export const TENDERS: Tender[] = [
   {
     ref: "GEM/2026/B/458213",
     title: "Supply of Industrial Safety & Protective Equipment",
-    department: "Chennai Petroleum Corporation Limited (CPCL)",
+    department: "Central Public Procurement Division",
     category: "Safety Equipment",
     estimatedValue: "₹ 48.50 Lakhs",
     closingDate: "15 Oct 2026",
@@ -52,7 +69,7 @@ export const TENDERS: Tender[] = [
   {
     ref: "GEM/2026/B/992104",
     title: "High-Pressure Refinery Valve Assemblies & Actuators",
-    department: "Chennai Petroleum Corporation Limited (CPCL)",
+    department: "Engineering Procurement Directorate",
     category: "Heavy Machinery & Refinery Valves",
     estimatedValue: "₹ 3.20 Crores",
     closingDate: "28 Oct 2026",
@@ -67,7 +84,7 @@ export const TENDERS: Tender[] = [
   {
     ref: "GEM/2026/B/110482",
     title: "Turnkey Fire Hydrant Automation & Leak Monitoring",
-    department: "Chennai Petroleum Corporation Limited (CPCL)",
+    department: "Fire & Safety Systems Directorate",
     category: "Safety Instrumentation",
     estimatedValue: "₹ 1.85 Crores",
     closingDate: "05 Nov 2026",
@@ -104,11 +121,11 @@ export const BASE_BIDDERS: Bidder[] = [
     gstin: "33AAAAA0000A1Z5",
     score: 96,
     risk: "Low",
-    status: "Cleared",
+    status: "Under Verification",
+    isAiVerified: false,
     pending: 0,
-    lastChecked: "2 hours ago",
-    recommendation:
-      "All statutory and eligibility requirements verified against portal records. Bidder meets core GeM procurement parameters.",
+    lastChecked: "Awaiting Verification",
+    recommendation: "Statutory credentials and certificates attached. Ready for AI document verification.",
     checks: [
       { label: "Udyam / MSME Registration", status: "verified" },
       { label: "GST Registration & Returns", status: "verified" },
@@ -123,11 +140,11 @@ export const BASE_BIDDERS: Bidder[] = [
     gstin: "07BBBBB1111B2Z6",
     score: 88,
     risk: "Low",
-    status: "Cleared",
+    status: "Under Verification",
+    isAiVerified: false,
     pending: 0,
-    lastChecked: "3 hours ago",
-    recommendation:
-      "All statutory requirements verified. Minor documentation formatting noted, no impact on statutory eligibility.",
+    lastChecked: "Awaiting Verification",
+    recommendation: "Udyam and GST certificates submitted. Ready for AI document verification.",
     checks: [
       { label: "Udyam / MSME Registration", status: "verified" },
       { label: "GST Registration & Returns", status: "verified" },
@@ -141,16 +158,16 @@ export const BASE_BIDDERS: Bidder[] = [
     gstin: "29CCCCC2222C3Z7",
     score: 72,
     risk: "Medium",
-    status: "Flagged",
+    status: "Under Verification",
+    isAiVerified: false,
     pending: 2,
-    lastChecked: "45 minutes ago",
-    recommendation:
-      "EPFO certificate has expired and GST returns show a delay in the last filing cycle. Recommend requesting updated documents before commercial opening.",
+    lastChecked: "Awaiting Verification",
+    recommendation: "Certificates uploaded. Potential filing delay noted in GSTR-3B audit.",
     checks: [
       { label: "Udyam / MSME Registration", status: "verified" },
-      { label: "GST Registration & Returns", status: "flagged", note: "GSTR-3B return for Q2 filed 18 days past due date." },
+      { label: "GST Registration & Returns", status: "flagged", note: "GSTR-3B return for Q2 filed past due date." },
       { label: "PAN & Income Tax Compliance", status: "verified" },
-      { label: "EPFO / ESIC Compliance", status: "flagged", note: "EPFO electronic challan return receipt expired 3 months ago." },
+      { label: "EPFO / ESIC Compliance", status: "flagged", note: "EPFO electronic challan return receipt expired." },
     ],
   },
   {
@@ -159,10 +176,11 @@ export const BASE_BIDDERS: Bidder[] = [
     gstin: "24DDDDD3333D4Z8",
     score: 91,
     risk: "Low",
-    status: "Cleared",
+    status: "Under Verification",
+    isAiVerified: false,
     pending: 0,
-    lastChecked: "1 hour ago",
-    recommendation: "All statutory registrations and tender-specific eligibility verified. Fully compliant for award consideration.",
+    lastChecked: "Awaiting Verification",
+    recommendation: "All statutory registrations and tender-specific documents uploaded.",
     checks: [
       { label: "Udyam / MSME Registration", status: "verified" },
       { label: "GST Registration & Returns", status: "verified" },
@@ -176,51 +194,15 @@ export const BASE_BIDDERS: Bidder[] = [
     gstin: "19EEEEE4444E5Z9",
     score: 58,
     risk: "High",
-    status: "Flagged",
+    status: "Under Verification",
+    isAiVerified: false,
     pending: 4,
-    lastChecked: "20 minutes ago",
-    recommendation:
-      "Multiple severe discrepancies detected, including a possible match on the Central Public Procurement Portal debarment list. Manual officer scrutiny required.",
+    lastChecked: "Awaiting Verification",
+    recommendation: "Statutory documents uploaded. Cross-portal validation required.",
     checks: [
-      { label: "Udyam / MSME Registration", status: "flagged", note: "Udyam enterprise number does not match registered entity name." },
-      { label: "PAN & Income Tax Compliance", status: "flagged", note: "PAN records mismatch with MCA21 incorporation filing." },
-      { label: "OEM Authorization", status: "flagged", note: "Mandatory OEM Authorization letter not submitted." },
-      { label: "Blacklisting & Debarment Status", status: "flagged", note: "Exact company name match found on CPPP Debarment list." },
-    ],
-  },
-  {
-    id: "b6",
-    name: "Anand Startup Innovations",
-    gstin: "27FFFFF5555F6Z0",
-    score: 84,
-    risk: "Low",
-    status: "Cleared",
-    pending: 1,
-    lastChecked: "4 hours ago",
-    recommendation:
-      "Statutory requirements verified. DPIIT Startup India certificate is due for annual renewal within 30 days.",
-    checks: [
-      { label: "Udyam / MSME Registration", status: "verified" },
-      { label: "GST Registration & Returns", status: "verified" },
-      { label: "Startup India Recognition", status: "flagged", note: "DPIIT recognition renewal due in 30 days." },
-    ],
-  },
-  {
-    id: "b7",
-    name: "Ganga Engineering Works",
-    gstin: "09GGGGG6666G7Z1",
-    score: 65,
-    risk: "Medium",
-    status: "Under Review",
-    pending: 3,
-    lastChecked: "10 minutes ago",
-    recommendation:
-      "Verification in progress for declared local content and ESIC active registration. Awaiting officer review of uploaded chartered engineer certificate.",
-    checks: [
-      { label: "GST Registration & Returns", status: "verified" },
-      { label: "PAN & Income Tax Compliance", status: "verified" },
-      { label: "ESIC Compliance", status: "flagged", note: "Employer registration code under manual validation." },
-      { label: "Make in India / Local Content", status: "flagged", note: "Declared 62% local content, supporting auditor certificate pending." },
+      { label: "Udyam / MSME Registration", status: "flagged", note: "Udyam enterprise number requires officer review." },
+      { label: "PAN & Income Tax Compliance", status: "flagged", note: "PAN records under verification." },
+      { label: "OEM Authorization", status: "flagged", note: "OEM Authorization letter pending validation." },
     ],
   },
 ];
@@ -297,7 +279,7 @@ export function getEvaluatedBidders(tenderRef?: string): Bidder[] {
     let score = Math.max(20, baseBidder.score - scorePenalty);
     let pending = baseBidder.pending + tenderFlags;
     let risk: "Low" | "Medium" | "High" = baseBidder.risk;
-    let status: "Cleared" | "Flagged" | "Under Review" = baseBidder.status;
+    let status: "Under Verification" | "Verified" | "Rejected" | "Documents Requested" | "Cleared" | "Flagged" | "Under Review" = baseBidder.status;
     let recommendation = baseBidder.recommendation;
 
     if (tenderFlags > 0) {
@@ -309,12 +291,17 @@ export function getEvaluatedBidders(tenderRef?: string): Bidder[] {
 
     return {
       ...baseBidder,
-      score,
+      score: baseBidder.complianceScore || score,
       risk,
-      status,
+      status: baseBidder.officerDecision || baseBidder.status,
       pending,
       recommendation,
       checks,
+      isAiVerified: baseBidder.isAiVerified ?? false,
+      complianceScore: baseBidder.complianceScore,
+      documentScores: baseBidder.documentScores,
+      officerDecision: baseBidder.officerDecision,
+      feedbackMessage: baseBidder.feedbackMessage,
     };
   });
 }

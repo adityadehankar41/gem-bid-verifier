@@ -1,271 +1,180 @@
-import { useEffect, useState, ReactNode } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import OfficerHeader from "../components/OfficerHeader";
 import Footer from "../components/Footer";
-import { SearchIcon, SortIcon, CloseIcon } from "../components/icons";
-import { ScoreBar, RiskBadge, StatusBadge } from "../components/badges";
-import { TENDERS, Bidder, Tender } from "../data/bidders";
-import { useAuditLog } from "../context/AuditLogContext";
+import { SearchIcon, ShieldCheckIcon } from "../components/icons";
+import { Bidder, DocumentScoreItem } from "../data/bidders";
 import { useBidderContext } from "../context/BidderContext";
 
-interface ComplianceDashboardProps {
-  activeTenderId?: string;
-  onSelectTender?: (ref: string) => void;
-}
+// Standard statutory documents evaluated for each bid
+const DEFAULT_DOCUMENTS = [
+  { id: "udyamCert", name: "Udyam Registration Certificate (PDF)", baseScore: 96, detail: "MSME classification verified on Udyam portal." },
+  { id: "gstCert", name: "GST Registration Certificate & Latest GSTR-3B", baseScore: 92, detail: "Active GSTIN with regular return filings." },
+  { id: "panCard", name: "PAN Card of Entity / Authorized Signatory", baseScore: 98, detail: "Matched with CBDT and MCA21 database." },
+  { id: "itrProof", name: "Income Tax Returns Acknowledgement (AY 2025-26)", baseScore: 90, detail: "Verified electronic verification code (EVC)." },
+];
 
-export default function ComplianceDashboard({
-  activeTenderId = TENDERS[0].ref,
-  onSelectTender,
-}: ComplianceDashboardProps) {
+export default function ComplianceDashboard() {
   const navigate = useNavigate();
-  const { addLog } = useAuditLog();
-  const { getAllBidders, customBidders, resetBiddersToDefault } = useBidderContext();
+  const { getAllBidders, customBidders, resetBiddersToDefault, completeAiVerification } = useBidderContext();
   const [search, setSearch] = useState("");
-  const [riskFilter, setRiskFilter] = useState("All");
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
-  const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  const currentTender = TENDERS.find((t) => t.ref === activeTenderId) || TENDERS[0];
-  const evaluatedBidders = getAllBidders(activeTenderId);
+  // State for AI Verification in progress
+  const [verifyingBidder, setVerifyingBidder] = useState<Bidder | null>(null);
 
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") setSelectedId(null);
+  const allBidders = getAllBidders();
+  const pendingBidders = allBidders.filter((b) => !b.isAiVerified);
+  const verifiedBidders = allBidders.filter((b) => b.isAiVerified);
+
+  const filteredPending = pendingBidders.filter((b) =>
+    b.name.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const handleStartVerification = (bidder: Bidder) => {
+    setVerifyingBidder(bidder);
+  };
+
+  const handleFinishAiVerification = (
+    bidder: Bidder,
+    docScores: DocumentScoreItem[],
+    averageScore: number,
+    redirectToVerified: boolean = false
+  ) => {
+    completeAiVerification(bidder.id, docScores, averageScore);
+    setVerifyingBidder(null);
+    if (redirectToVerified) {
+      navigate("/officer/verified");
     }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
-
-  const filtered = evaluatedBidders
-    .filter((b) => {
-      const q = search.toLowerCase();
-      const matchesSearch = b.name.toLowerCase().includes(q) || b.gstin.toLowerCase().includes(q);
-      const matchesRisk = riskFilter === "All" || b.risk === riskFilter;
-      return matchesSearch && matchesRisk;
-    })
-    .sort((a, b) => (sortDir === "desc" ? b.score - a.score : a.score - b.score));
-
-  const totalBidders = evaluatedBidders.length;
-  const clearedCount = evaluatedBidders.filter((b) => b.status === "Cleared").length;
-  const flaggedCount = evaluatedBidders.filter((b) => b.status === "Flagged").length;
-  const highRiskCount = evaluatedBidders.filter((b) => b.risk === "High").length;
-
-  const selectedBidder = evaluatedBidders.find((b) => b.id === selectedId) || null;
-
-  // CSV Export Functionality
-  function handleExportCSV() {
-    const headers = ["Bidder ID", "Bidder Name", "GSTIN", "Risk Level", "Score", "Compliance Status", "Flagged Items", "Last Audited"];
-    const rows = filtered.map((b) => [
-      `"${b.id}"`,
-      `"${b.name.replace(/"/g, '""')}"`,
-      `"${b.gstin}"`,
-      `"${b.risk}"`,
-      b.score,
-      `"${b.status}"`,
-      b.pending,
-      `"${b.lastChecked}"`
-    ]);
-    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map((e) => e.join(","))].join("\n");
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `Bid_Evaluation_${currentTender.ref.replace(/[^a-zA-Z0-9]/g, "_")}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  }
-
+  };
 
   return (
     <div className="min-h-screen w-full flex flex-col" style={{ backgroundColor: "#F7F6F2" }}>
-      <OfficerHeader
-        tenders={TENDERS}
-        activeTenderId={activeTenderId}
-        onSelectTender={onSelectTender}
-      />
+      <OfficerHeader />
 
-      <div className="flex-1 max-w-6xl w-full mx-auto px-6 md:px-8 py-8">
-        {/* Tender Specification Banner */}
-        <div className="p-5 rounded bg-white border border-[#DCD7CB] mb-6 shadow-2xs">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-[#EDEAE1]">
+      {/* If an individual bid is undergoing AI verification, display the AI Verification Screen */}
+      {verifyingBidder ? (
+        <AIVerificationScreen
+          bidder={verifyingBidder}
+          onCancel={() => setVerifyingBidder(null)}
+          onComplete={(docScores, avg, redirect) =>
+            handleFinishAiVerification(verifyingBidder, docScores, avg, redirect)
+          }
+        />
+      ) : (
+        <div className="flex-1 max-w-5xl w-full mx-auto px-6 md:px-8 py-8">
+          {/* Header Title & Nav actions */}
+          <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-xs px-2 py-0.5 rounded font-mono font-semibold bg-[#EEF5F1] text-[#1F7A5C] border border-[#BDE0D2]">
-                  {currentTender.ref}
-                </span>
-                <span className="text-xs text-[#5B6B7D]">&middot; {currentTender.department}</span>
-              </div>
               <h1 style={{ fontFamily: "'Fraunces', serif", color: "#171E27" }} className="text-2xl md:text-3xl font-bold">
-                {currentTender.title}
+                Procurement Officer Verification Portal
               </h1>
+              <p className="text-sm text-[#5B6B7D] mt-1">
+                Pending statutory bids awaiting AI document verification and compliance evaluation.
+              </p>
             </div>
 
-            {onSelectTender && (
-              <div className="flex items-center gap-2 bg-[#FAF9F6] px-3 py-2 rounded border border-[#EDEAE1]">
-                <span className="text-xs text-[#5B6B7D] font-medium">Switch Tender:</span>
-                <select
-                  value={activeTenderId}
-                  onChange={(e) => onSelectTender(e.target.value)}
-                  className="text-xs font-semibold bg-white px-2.5 py-1.5 rounded border border-[#DCD7CB] cursor-pointer"
+            <div className="flex items-center gap-3 self-start sm:self-auto">
+              {customBidders.length > 0 && (
+                <button
+                  type="button"
+                  onClick={resetBiddersToDefault}
+                  className="text-xs px-3 py-2 rounded bg-white border border-[#DCD7CB] text-[#5B6B7D] hover:bg-[#EDEAE1] transition-colors cursor-pointer font-medium"
+                  title="Reset all test submissions"
                 >
-                  {TENDERS.map((t) => (
-                    <option key={t.ref} value={t.ref}>
-                      {t.ref} ({t.category})
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-          </div>
+                  Reset Live Bids
+                </button>
+              )}
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-3 text-xs">
-            <div>
-              <span className="text-[#8A96A3] block">Estimated Tender Value</span>
-              <span className="font-semibold text-[#171E27]">{currentTender.estimatedValue}</span>
-            </div>
-            <div>
-              <span className="text-[#8A96A3] block">Min. Make in India (MII)</span>
-              <span className="font-semibold text-[#1F7A5C]">{currentTender.requirements.minLocalContent}% Local Content</span>
-            </div>
-            <div>
-              <span className="text-[#8A96A3] block">OEM Authorization</span>
-              <span className={`font-semibold ${currentTender.requirements.requiresOEM ? "text-[#95601F]" : "text-[#171E27]"}`}>
-                {currentTender.requirements.requiresOEM ? "Mandatory for Category" : "Standard Reseller Allowed"}
-              </span>
-            </div>
-            <div>
-              <span className="text-[#8A96A3] block">Turnover &amp; Exemption</span>
-              <span className="font-semibold text-[#171E27]">
-                {currentTender.requirements.startupExemption ? "Startup/MSME Exempt" : "No Exemption"}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Aggregate Metric Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <StatCard label="Total Bidders" value={totalBidders} dot="#5B6B7D" subtitle="Evaluated for this tender" />
-          <StatCard label="Cleared" value={clearedCount} dot="#1F7A5C" subtitle="Compliant across all gates" />
-          <StatCard label="Flagged" value={flaggedCount} dot="#B8752E" subtitle="Discrepancies identified" />
-          <StatCard label="High Risk" value={highRiskCount} dot="#B23A3A" subtitle="Requires officer review" />
-        </div>
-
-        {/* Filter & Search Bar */}
-        <div className="flex flex-col sm:flex-row gap-3 mb-4">
-          <div className="relative flex-1">
-            <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#8A96A3]">
-              <SearchIcon />
-            </span>
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search bidders by company name or GSTIN..."
-              aria-label="Search bidders"
-              className="w-full pl-10 pr-4 py-2.5 text-sm rounded bg-white outline-none transition-all"
-              style={{ border: "1px solid #DCD7CB", color: "#171E27" }}
-            />
-          </div>
-          <div className="flex items-center gap-2">
-            <select
-              value={riskFilter}
-              onChange={(e) => setRiskFilter(e.target.value)}
-              aria-label="Filter by risk level"
-              className="px-3.5 py-2.5 text-sm rounded bg-white cursor-pointer"
-              style={{ border: "1px solid #DCD7CB", color: "#171E27" }}
-            >
-              <option value="All">All Risk Levels</option>
-              <option value="Low">Low Risk Only</option>
-              <option value="Medium">Medium Risk Only</option>
-              <option value="High">High Risk Only</option>
-            </select>
-            <button
-                onClick={handleExportCSV}
-                className="px-3.5 py-2.5 text-xs font-semibold rounded bg-[#171E27] text-white hover:bg-[#25303D] transition-colors cursor-pointer whitespace-nowrap flex items-center gap-1.5"
-                title="Export complete technical evaluation summary to CSV"
->
-                <span>Export Matrix (CSV)</span>
-            </button>
-            {customBidders.length > 0 && (
-              <button
-                onClick={resetBiddersToDefault}
-                className="px-3 py-2.5 text-xs font-medium rounded bg-[#F4EFE6] border border-[#C8BFAD] text-[#7C8896] hover:text-[#171E27] hover:bg-[#EDEAE1] transition-colors cursor-pointer whitespace-nowrap"
-                title="Clear live submissions and return to standard benchmarks"
+              {/* Button navigating to the completely separate Verified Bidders screen */}
+              <Link
+                to="/officer/verified"
+                className="inline-flex items-center gap-2 text-xs font-semibold px-4 py-2 rounded bg-[#1F7A5C] text-white hover:bg-[#18644A] transition-colors shadow-2xs text-decoration-none"
               >
-                Reset ({customBidders.length})
-              </button>
-            )}
+                <span>Verified Bidders</span>
+                <span className="px-1.5 py-0.2 rounded-full bg-white/20 text-white text-[11px] font-bold">
+                  {verifiedBidders.length}
+                </span>
+                <span>&rarr;</span>
+              </Link>
+            </div>
           </div>
-        </div>
 
-        {filtered.length === 0 ? (
-          <EmptyState />
-        ) : (
-          <>
-            {/* Desktop Table View */}
-            <div className="hidden md:block rounded overflow-hidden" style={{ border: "1px solid #DCD7CB", backgroundColor: "#FFFFFF" }}>
+          {/* Search Bar */}
+          <div className="mb-6">
+            <div className="relative max-w-md">
+              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#8A96A3]">
+                <SearchIcon />
+              </span>
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search pending bids by company name..."
+                aria-label="Search pending bids"
+                className="w-full pl-10 pr-4 py-2.5 text-sm rounded bg-white outline-none transition-all shadow-2xs"
+                style={{ border: "1px solid #DCD7CB", color: "#171E27" }}
+                onFocus={(e) => {
+                  e.target.style.borderColor = "#1F7A5C";
+                  e.target.style.boxShadow = "0 0 0 2px rgba(31,122,92,0.15)";
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = "#DCD7CB";
+                  e.target.style.boxShadow = "none";
+                }}
+              />
+            </div>
+          </div>
+
+          {/* Pending Bids Table */}
+          {filteredPending.length === 0 ? (
+            <div className="p-12 text-center bg-white rounded border border-[#DCD7CB] shadow-2xs">
+              <div className="w-12 h-12 rounded-full bg-[#EEF5F1] border border-[#BDE0D2] flex items-center justify-center mx-auto mb-3 text-[#1F7A5C]">
+                <ShieldCheckIcon size={24} />
+              </div>
+              <p className="text-base font-semibold text-[#171E27]">No pending bids awaiting verification</p>
+              <p className="text-xs text-[#8A96A3] mt-1 max-w-md mx-auto mb-5">
+                {pendingBidders.length === 0
+                  ? "All submitted bids have completed AI verification. You can view them on the Verified Bidders screen to record official determinations."
+                  : "No pending bids match your search query."}
+              </p>
+              <Link
+                to="/officer/verified"
+                className="inline-flex items-center gap-2 text-xs font-semibold px-5 py-2.5 rounded bg-[#171E27] text-white hover:bg-[#2A3747] transition-colors shadow-xs text-decoration-none"
+              >
+                Go to Verified Bidders ({verifiedBidders.length}) &rarr;
+              </Link>
+            </div>
+          ) : (
+            <div className="rounded overflow-hidden bg-white border border-[#DCD7CB] shadow-2xs">
               <table className="w-full text-sm" style={{ borderCollapse: "collapse" }}>
                 <thead>
-                  <tr className="bg-[#FAF9F6]" style={{ borderBottom: "1px solid #DCD7CB" }}>
-                    <Th>Bidder / Company</Th>
-                    <Th sortable sortDir={sortDir} onSort={() => setSortDir((d) => (d === "desc" ? "asc" : "desc"))}>
-                      BidSure AI Score
-                    </Th>
-                    <Th>Risk Level</Th>
-                    <Th>Status</Th>
-                    <Th>Tender Discrepancies</Th>
-                    <Th>Last Verified</Th>
-                    <Th className="text-right">Action</Th>
+                  <tr className="bg-[#FAF9F6] border-b border-[#DCD7CB]">
+                    <th className="px-6 py-3.5 text-left text-xs font-semibold text-[#5B6B7D] uppercase tracking-wider">
+                      Bidder
+                    </th>
+                    <th className="px-6 py-3.5 text-right text-xs font-semibold text-[#5B6B7D] uppercase tracking-wider">
+                      Action
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map((b) => (
+                  {filteredPending.map((b) => (
                     <tr
                       key={b.id}
-                      className="transition-colors hover:bg-[#F9F8F5]"
-                      style={{ borderBottom: "1px solid #EDEAE1" }}
+                      className="transition-colors hover:bg-[#F9F8F5] border-b border-[#EDEAE1] last:border-b-0"
                     >
-                      <td className="px-4 py-3.5">
-                        <div className="flex items-center gap-2">
-                          <p className="font-semibold text-[#171E27]">{b.name}</p>
-                          {b.id.startsWith("bidder-") && (
-                            <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-[#E3F2EB] text-[#1F7A5C] border border-[#B5DECB]">
-                              New Submission
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-xs font-mono text-[#8A96A3] mt-0.5">{b.gstin}</p>
+                      <td className="px-6 py-4">
+                        <span className="font-semibold text-[#171E27] text-base block">
+                          {b.name}
+                        </span>
                       </td>
-                      <td className="px-4 py-3.5">
-                        <ScoreBar score={b.score} />
-                      </td>
-                      <td className="px-4 py-3.5">
-                        <RiskBadge risk={b.risk} />
-                      </td>
-                      <td className="px-4 py-3.5">
-                        <StatusBadge status={b.status} />
-                      </td>
-                      <td className="px-4 py-3.5">
-                        {b.pending > 0 ? (
-                          <span className="font-semibold text-[#95601F] text-xs px-2 py-0.5 rounded bg-[#FBF1E4]">
-                            {b.pending} flagged
-                          </span>
-                        ) : (
-                          <span className="text-xs text-[#1F7A5C] font-medium">All gates cleared</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3.5 text-xs text-[#8A96A3]">{b.lastChecked}</td>
-                      <td className="px-4 py-3.5 text-right">
+                      <td className="px-6 py-4 text-right">
                         <button
-                          onClick={() => setSelectedId(b.id)}
-                          className="text-xs font-semibold px-3 py-1.5 rounded cursor-pointer transition-colors shadow-2xs hover:bg-[#F4EFE6]"
-                          style={{
-                            color: "#0F1B2D",
-                            border: "1px solid #DCD7CB",
-                            backgroundColor: "#FFFFFF",
-                          }}
+                          type="button"
+                          onClick={() => handleStartVerification(b)}
+                          className="text-xs font-semibold px-5 py-2 rounded cursor-pointer transition-all shadow-xs bg-[#171E27] text-white hover:bg-[#2A3747]"
                         >
-                          Review &rarr;
+                          Verify
                         </button>
                       </td>
                     </tr>
@@ -273,326 +182,230 @@ export default function ComplianceDashboard({
                 </tbody>
               </table>
             </div>
-
-            {/* Mobile Card View */}
-            <div className="md:hidden space-y-3">
-              {filtered.map((b) => (
-                <button
-                  key={b.id}
-                  onClick={() => setSelectedId(b.id)}
-                  className="w-full text-left p-4 rounded bg-white"
-                  style={{ border: "1px solid #DCD7CB" }}
-                >
-                  <div className="flex items-start justify-between gap-3 mb-2">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <p className="font-semibold text-sm text-[#171E27]">{b.name}</p>
-                        {b.id.startsWith("bidder-") && (
-                          <span className="text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-[#E3F2EB] text-[#1F7A5C]">
-                            New
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-xs font-mono text-[#8A96A3]">{b.gstin}</p>
-                    </div>
-                    <RiskBadge risk={b.risk} />
-                  </div>
-                  <ScoreBar score={b.score} wide />
-                  <div className="flex items-center justify-between mt-3 pt-2 border-t border-[#EDEAE1]">
-                    <StatusBadge status={b.status} />
-                    <span className="text-xs text-[#8A96A3]">
-                      {b.pending} flagged &middot; {b.lastChecked}
-                    </span>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </>
-        )}
-      </div>
+          )}
+        </div>
+      )}
 
       <Footer />
+    </div>
+  );
+}
 
-      {/* Slide-over Detail Drawer */}
-      <div
-        className="fixed inset-0 transition-opacity duration-300 z-50"
-        style={{
-          pointerEvents: selectedBidder ? "auto" : "none",
-          opacity: selectedBidder ? 1 : 0,
-        }}
-        aria-hidden={!selectedBidder}
-      >
-        <div
-          className="absolute inset-0 bg-black/45 backdrop-blur-xs transition-opacity duration-300"
-          onClick={() => setSelectedId(null)}
-        />
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label="Bidder compliance detail"
-          className="absolute top-0 right-0 h-full overflow-y-auto transition-transform duration-300 shadow-2xl"
-          style={{
-            width: "100%",
-            maxWidth: 480,
-            backgroundColor: "#FFFFFF",
-            borderLeft: "1px solid #DCD7CB",
-            transform: selectedBidder ? "translateX(0)" : "translateX(100%)",
-          }}
-        >
-          {selectedBidder && (
-            <DrawerContent
-              key={selectedBidder.id}
-              bidder={selectedBidder}
-              currentTender={currentTender}
-              onClose={() => setSelectedId(null)}
-              onViewFullReport={() => {
-                const id = selectedBidder.id;
-                setSelectedId(null);
-                navigate(`/officer/bidder/${id}`);
-              }}
-              addLog={addLog}
-            />
+// AI Document Verification Screen evaluating individual documents one by one
+function AIVerificationScreen({
+  bidder,
+  onCancel,
+  onComplete,
+}: {
+  bidder: Bidder;
+  onCancel: () => void;
+  onComplete: (docScores: DocumentScoreItem[], avgScore: number, redirect: boolean) => void;
+}) {
+  const [docScores, setDocScores] = useState<
+    { name: string; score: number; status: "pending" | "scanning" | "verified"; detail: string }[]
+  >(() =>
+    DEFAULT_DOCUMENTS.map((doc, idx) => {
+      // Dynamic realistic variation per bidder
+      const variance = (bidder.name.length + idx * 3) % 9 - 4; // -4 to +4
+      const score = Math.min(99, Math.max(82, doc.baseScore + variance));
+      return {
+        name: doc.name,
+        score,
+        status: "pending",
+        detail: doc.detail,
+      };
+    })
+  );
+
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [isCompleted, setIsCompleted] = useState(false);
+
+  // Sequentially verify documents one by one
+  useEffect(() => {
+    if (currentIndex >= docScores.length) {
+      const timer = setTimeout(() => {
+        setIsCompleted(true);
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+
+    // Step 1: Mark active document as scanning
+    const scanningTimer = setTimeout(() => {
+      setDocScores((prev) =>
+        prev.map((d, i) => (i === currentIndex ? { ...d, status: "scanning" } : d))
+      );
+    }, 100);
+
+    // Step 2: Mark active document as verified with its individual score
+    const verifyTimer = setTimeout(() => {
+      setDocScores((prev) =>
+        prev.map((d, i) => (i === currentIndex ? { ...d, status: "verified" } : d))
+      );
+      setCurrentIndex((idx) => idx + 1);
+    }, 850);
+
+    return () => {
+      clearTimeout(scanningTimer);
+      clearTimeout(verifyTimer);
+    };
+  }, [currentIndex, docScores.length]);
+
+  // Compute total compliance score by taking the average of all single documents
+  const verifiedItems = docScores.filter((d) => d.status === "verified");
+  const totalScoreSum = verifiedItems.reduce((acc, curr) => acc + curr.score, 0);
+  const averageComplianceScore =
+    verifiedItems.length > 0 ? Math.round(totalScoreSum / verifiedItems.length) : 0;
+
+  const handleFinish = (redirect: boolean) => {
+    const formattedScores: DocumentScoreItem[] = docScores.map((d, i) => ({
+      id: `doc-${i}`,
+      name: d.name,
+      score: d.score,
+      status: "verified",
+      detail: d.detail,
+    }));
+    onComplete(formattedScores, averageComplianceScore, redirect);
+  };
+
+  return (
+    <div className="flex-1 flex flex-col items-center justify-center px-6 py-12">
+      <div className="w-full max-w-xl bg-white p-8 rounded border border-[#DCD7CB] shadow-lg">
+        {/* Top Header */}
+        <div className="text-center mb-8">
+          <div className="flex justify-center mb-3">
+            <div className="w-14 h-14 rounded-full bg-[#EEF5F1] border-2 border-[#1F7A5C] flex items-center justify-center text-[#1F7A5C]">
+              <ShieldCheckIcon size={26} />
+            </div>
+          </div>
+          <span className="text-[11px] font-bold uppercase tracking-wider text-[#1F7A5C] block mb-1">
+            AI Statutory Document Verification
+          </span>
+          <h2
+            style={{ fontFamily: "'Fraunces', serif" }}
+            className="text-2xl font-bold text-[#171E27] mb-1"
+          >
+            {bidder.name}
+          </h2>
+          <p className="text-xs text-[#5B6B7D]">
+            Evaluating submitted statutory documents one by one and cross-referencing national databases.
+          </p>
+        </div>
+
+        {/* List of documents verified one by one */}
+        <div className="space-y-3 mb-6">
+          {docScores.map((doc, idx) => {
+            const isScanning = doc.status === "scanning";
+            const isDone = doc.status === "verified";
+
+            return (
+              <div
+                key={doc.name}
+                className="p-3.5 rounded transition-all text-xs flex items-center justify-between"
+                style={{
+                  backgroundColor: isScanning
+                    ? "#FFFDF5"
+                    : isDone
+                    ? "#F6FAF7"
+                    : "#FAF9F6",
+                  border: isScanning
+                    ? "1.5px solid #D4A038"
+                    : isDone
+                    ? "1px solid #BDE0D2"
+                    : "1px solid #EDEAE1",
+                }}
+              >
+                <div className="flex items-center gap-3">
+                  <span
+                    className="w-6 h-6 rounded-full flex items-center justify-center font-bold text-[11px]"
+                    style={{
+                      backgroundColor: isDone ? "#1F7A5C" : isScanning ? "#D4A038" : "#EDEAE1",
+                      color: isDone || isScanning ? "#FFFFFF" : "#8A96A3",
+                    }}
+                  >
+                    {isDone ? "✓" : idx + 1}
+                  </span>
+                  <div>
+                    <p className="font-semibold text-[#171E27]">{doc.name}</p>
+                    <p className="text-[11px] text-[#5B6B7D]">
+                      {isScanning
+                        ? "AI cross-referencing cryptographic hash and ministry database..."
+                        : isDone
+                        ? doc.detail
+                        : "Queued for automated verification"}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Score out of 100 for each single document */}
+                <div>
+                  {isDone ? (
+                    <div className="px-2.5 py-1 rounded bg-white border border-[#BDE0D2] flex items-center gap-1 font-mono font-bold text-[#1F7A5C]">
+                      <span>{doc.score}</span>
+                      <span className="text-[10px] text-[#8A96A3] font-normal">/ 100</span>
+                    </div>
+                  ) : isScanning ? (
+                    <span className="inline-block w-4 h-4 border-2 border-[#D4A038] border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <span className="text-[11px] text-[#8A96A3] italic">Pending</span>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Calculated Total Compliance Score Result */}
+        {isCompleted ? (
+          <div className="p-4 rounded bg-[#EEF5F1] border border-[#BDE0D2] text-center mb-6">
+            <span className="text-[11px] uppercase font-bold text-[#1F7A5C] tracking-wider block mb-1">
+              Verification Complete
+            </span>
+            <div className="flex items-center justify-center gap-2 mb-1">
+              <span className="text-3xl font-bold font-mono text-[#171E27]">
+                {averageComplianceScore}
+              </span>
+              <span className="text-sm font-semibold text-[#5B6B7D]">/ 100</span>
+            </div>
+            <p className="text-xs text-[#3E4C59]">
+              Total Compliance Score calculated as the average of all 4 submitted statutory documents.
+            </p>
+          </div>
+        ) : (
+          <div className="p-3 mb-6 rounded bg-[#FAF9F6] border border-[#EDEAE1] text-center text-xs text-[#5B6B7D]">
+            Verifying document {Math.min(currentIndex + 1, docScores.length)} of {docScores.length}...
+          </div>
+        )}
+
+        {/* Actions */}
+        <div className="flex flex-col sm:flex-row items-center gap-3">
+          {isCompleted ? (
+            <>
+              <button
+                type="button"
+                onClick={() => handleFinish(true)}
+                className="w-full py-2.5 text-xs font-semibold rounded text-white bg-[#1F7A5C] hover:bg-[#18644A] cursor-pointer shadow-xs transition-colors text-center"
+              >
+                Go to Verified Bidders Screen &rarr;
+              </button>
+              <button
+                type="button"
+                onClick={() => handleFinish(false)}
+                className="w-full sm:w-auto px-4 py-2.5 text-xs font-semibold rounded border border-[#DCD7CB] text-[#5B6B7D] hover:bg-[#FAF9F6] cursor-pointer transition-colors text-center whitespace-nowrap"
+              >
+                Verify Next Bid
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              onClick={onCancel}
+              className="w-full py-2.5 text-xs font-semibold rounded border border-[#DCD7CB] text-[#5B6B7D] hover:bg-[#FAF9F6] cursor-pointer transition-colors text-center"
+            >
+              Cancel Verification
+            </button>
           )}
         </div>
       </div>
-    </div>
-  );
-}
-
-function DrawerContent({
-  bidder,
-  currentTender,
-  onClose,
-  onViewFullReport,
-  addLog,
-}: {
-  key?: string;
-  bidder: Bidder;
-  currentTender: Tender;
-  onClose: () => void;
-  onViewFullReport: () => void;
-  addLog: any;
-}) {
-  const [decision, setDecision] = useState<string | null>(null);
-
-  function handleDecision(label: string, detail: string) {
-    setDecision(label);
-    addLog({
-      bidder: bidder.name,
-      event: `Officer ${label.toLowerCase()}`,
-      actor: "Procurement Officer",
-      detail: `${detail} (Tender: ${currentTender.ref})`,
-    });
-  }
-
-  return (
-    <div className="p-6">
-      <div className="flex items-start justify-between mb-5 pb-4 border-b border-[#EDEAE1]">
-        <div>
-          <span className="text-[11px] uppercase tracking-wider font-semibold text-[#8A96A3] block mb-1">
-            Bidder Compliance Evaluation
-          </span>
-          <h2 style={{ fontFamily: "'Fraunces', serif", color: "#171E27" }} className="text-xl font-bold leading-snug">
-            {bidder.name}
-          </h2>
-          <p className="text-xs font-mono text-[#5B6B7D] mt-0.5">GSTIN: {bidder.gstin}</p>
-        </div>
-        <button
-          onClick={onClose}
-          aria-label="Close panel"
-          className="p-1.5 rounded hover:bg-[#EDEAE1] cursor-pointer text-[#5B6B7D]"
-        >
-          <CloseIcon />
-        </button>
-      </div>
-
-      <div className="flex items-center justify-between p-3.5 rounded mb-6 bg-[#FAF9F6] border border-[#EDEAE1]">
-        <div>
-          <p className="text-xs text-[#8A96A3] mb-1">Calculated Score</p>
-          <ScoreBar score={bidder.score} wide />
-        </div>
-        <div className="text-right">
-          <p className="text-xs text-[#8A96A3] mb-1">Risk Classification</p>
-          <RiskBadge risk={bidder.risk} />
-        </div>
-      </div>
-
-      <div className="mb-6">
-        <p className="text-xs uppercase tracking-wider font-semibold text-[#5B6B7D] mb-2.5">
-          Statutory &amp; Tender Verification Gates
-        </p>
-        <div className="space-y-2">
-          {bidder.checks.map((c) => (
-            <div
-              key={c.label}
-              className="p-3 rounded text-sm transition-colors"
-              style={{
-                border: `1px solid ${c.status === "verified" ? "#EDEAE1" : "#F0DEC6"}`,
-                backgroundColor: c.status === "verified" ? "#FFFFFF" : "#FDF8F0",
-              }}
-            >
-              <div className="flex items-center justify-between">
-                <span className="font-medium text-[#171E27]">{c.label}</span>
-                <span
-                  className="text-xs font-semibold px-2 py-0.5 rounded"
-                  style={{
-                    backgroundColor: c.status === "verified" ? "#EEF5F1" : "#FBF1E4",
-                    color: c.status === "verified" ? "#1F7A5C" : "#95601F",
-                  }}
-                >
-                  {c.status === "verified" ? "Verified" : "Flagged"}
-                </span>
-              </div>
-              {c.note && (
-                <p className="text-xs mt-1 text-[#95601F] leading-snug">
-                  &bull; {c.note}
-                </p>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* BidSure AI Recommendation Card */}
-      <div
-        className="p-4 mb-6 rounded"
-        style={{
-          borderLeft: `4px solid ${bidder.status === "Cleared" ? "#1F7A5C" : "#B8752E"}`,
-          backgroundColor: "#FAF9F6",
-          borderTop: "1px solid #DCD7CB",
-          borderRight: "1px solid #DCD7CB",
-          borderBottom: "1px solid #DCD7CB",
-        }}
-      >
-        <div className="flex items-center gap-1.5 mb-1.5">
-          <span className="w-2 h-2 rounded-full bg-[#1F7A5C]" />
-          <p className="text-xs font-semibold text-[#171E27]">BidSure AI Advisory Recommendation</p>
-        </div>
-        <p className="text-xs leading-relaxed text-[#3E4C59]">{bidder.recommendation}</p>
-      </div>
-
-      <button
-        onClick={onViewFullReport}
-        className="w-full py-2.5 text-xs font-semibold rounded mb-6 text-center cursor-pointer transition-colors"
-        style={{ color: "#0F1B2D", border: "1px solid #DCD7CB", backgroundColor: "#FFFFFF" }}
-      >
-        View Complete Bidder Dossier &amp; History &rarr;
-      </button>
-
-      {/* Human in the loop decision actions */}
-      <div className="border-t border-[#EDEAE1] pt-5">
-        <p className="text-xs uppercase tracking-wider font-semibold text-[#5B6B7D] mb-3">
-          Procurement Officer Decision
-        </p>
-
-        {decision ? (
-          <div className="p-3.5 rounded bg-[#EEF5F1] border border-[#BDE0D2] text-[#1F7A5C] text-xs font-medium">
-            &check; Bidder status recorded as <strong>{decision}</strong>. An immutable entry has been appended to the Audit Trail.
-          </div>
-        ) : (
-          <div className="flex flex-col gap-2">
-            <button
-              onClick={() => handleDecision("Approved", "Bidder cleared for commercial opening.")}
-              className="w-full py-2.5 text-xs font-semibold rounded text-white cursor-pointer shadow-2xs transition-all"
-              style={{ backgroundColor: "#1F7A5C" }}
-            >
-              Qualify &amp; Approve for Award
-            </button>
-            <button
-              onClick={() => handleDecision("Documents Requested", "Issued notice requesting missing/updated statutory proof.")}
-              className="w-full py-2.5 text-xs font-semibold rounded cursor-pointer transition-all"
-              style={{ border: "1px solid #DCD7CB", color: "#171E27", backgroundColor: "#FFFFFF" }}
-            >
-              Request Clarification / Documents
-            </button>
-            <button
-              onClick={() => handleDecision("Rejected", "Disqualified due to statutory non-compliance.")}
-              className="w-full py-2.5 text-xs font-semibold rounded cursor-pointer transition-all"
-              style={{ border: "1px solid #F0C4C4", color: "#973434", backgroundColor: "#FDF5F5" }}
-            >
-              Disqualify / Reject Bidder
-            </button>
-          </div>
-        )}
-
-        <p className="text-[11px] text-[#8A96A3] mt-4 leading-normal">
-          Statutory notice: As mandated by CPCL GeM procurement rules, the final qualification authority remains with the Procurement Officer. BidSure AI provides decision-support analysis only.
-        </p>
-      </div>
-    </div>
-  );
-}
-
-function Th({
-  children,
-  sortable,
-  sortDir,
-  onSort,
-  className = "",
-}: {
-  children?: ReactNode;
-  sortable?: boolean;
-  sortDir?: "asc" | "desc";
-  onSort?: () => void;
-  className?: string;
-}) {
-  if (!sortable) {
-    return (
-      <th className={`px-4 py-3 text-left text-xs font-semibold text-[#5B6B7D] ${className}`}>
-        {children}
-      </th>
-    );
-  }
-  return (
-    <th className={`px-4 py-3 text-left text-xs font-semibold text-[#5B6B7D] ${className}`}>
-      <button
-        onClick={onSort}
-        className="flex items-center gap-1.5 cursor-pointer hover:text-[#171E27]"
-        aria-label={`Sort by ${children}, currently ${sortDir === "desc" ? "highest first" : "lowest first"}`}
-      >
-        <span>{children}</span>
-        <SortIcon dir={sortDir || "desc"} />
-      </button>
-    </th>
-  );
-}
-
-function StatCard({
-  label,
-  value,
-  dot,
-  subtitle,
-}: {
-  label: string;
-  value: number;
-  dot: string;
-  subtitle: string;
-}) {
-  return (
-    <div className="p-4 rounded bg-white shadow-2xs" style={{ border: "1px solid #DCD7CB" }}>
-      <div className="flex items-center gap-2 mb-1.5">
-        <span className="rounded-full" style={{ width: 7, height: 7, backgroundColor: dot }} />
-        <span className="text-xs font-medium text-[#5B6B7D]">{label}</span>
-      </div>
-      <p style={{ fontFamily: "'Fraunces', serif", color: "#171E27" }} className="text-3xl font-bold">
-        {value}
-      </p>
-      <p className="text-[11px] text-[#8A96A3] mt-1">{subtitle}</p>
-    </div>
-  );
-}
-
-function EmptyState() {
-  return (
-    <div
-      className="flex flex-col items-center justify-center text-center py-16 px-4 rounded bg-white"
-      style={{ border: "1px dashed #DCD7CB" }}
-    >
-      <SearchIcon large />
-      <p className="text-base font-semibold mt-3 text-[#171E27]">No matching bidders found</p>
-      <p className="text-xs text-[#8A96A3] mt-1 max-w-sm">
-        Try modifying your search keywords or reset the risk filter to "All Risk Levels".
-      </p>
     </div>
   );
 }

@@ -1,16 +1,10 @@
-import { useState, useRef } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { DocIcon, CheckIcon, BigCheckIcon } from "../components/icons";
+import { useState, useRef, Fragment } from "react";
+import { Link } from "react-router-dom";
+import { DocIcon, CheckIcon } from "../components/icons";
 import Footer from "../components/Footer";
-import { TENDERS, Tender } from "../data/bidders";
-import { useBidderContext, SubmissionPayload } from "../context/BidderContext";
+import { useBidderContext } from "../context/BidderContext";
 
-interface BidderSubmissionProps {
-  activeTenderId?: string;
-  onSelectTender?: (ref: string) => void;
-}
-
-const STEPS = ["Business Details", "Statutory & Certifications", "Document Uploads", "Review & Submit"];
+const STEPS = ["Business Details", "Document Uploads", "Review & Submit"];
 
 const BASE_DOCS = [
   { id: "udyamCert", label: "Udyam Registration Certificate (PDF)" },
@@ -19,261 +13,278 @@ const BASE_DOCS = [
   { id: "itrProof", label: "Income Tax Returns Acknowledgement (AY 2025-26)" },
 ];
 
-export default function BidderSubmission({
-  activeTenderId = TENDERS[0].ref,
-  onSelectTender,
-}: BidderSubmissionProps) {
-  const { setLastSubmission } = useBidderContext();
-  const [selectedTenderRef, setSelectedTenderRef] = useState<string>(activeTenderId);
-  const currentTender = TENDERS.find((t) => t.ref === selectedTenderRef) || TENDERS[0];
-  const [step, setStep] = useState(0);
-  const [submitted, setSubmitted] = useState(false);
+// Validation helper functions
+function validateUdyam(val: string): string | null {
+  const trimmed = val.trim().toUpperCase();
+  if (!trimmed) return "Udyam Registration Number is required.";
+  const pattern = /^UDYAM-[A-Z]{2}-[0-9]{2}-[0-9]{7}$/;
+  if (!pattern.test(trimmed)) {
+    return "Invalid Udyam format. Must follow UDYAM-XX-00-0000000 (e.g., UDYAM-TN-03-0012345).";
+  }
+  return null;
+}
 
-  // Starts completely blank — NO hardcoded default data!
+function validateGSTIN(val: string): string | null {
+  const trimmed = val.trim().toUpperCase();
+  if (!trimmed) return "GSTIN is required.";
+  const pattern = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
+  if (!pattern.test(trimmed)) {
+    return "Invalid GSTIN format. Must be 15 alphanumeric characters (e.g., 33AAAAA0000A1Z5).";
+  }
+  return null;
+}
+
+function validatePAN(val: string): string | null {
+  const trimmed = val.trim().toUpperCase();
+  if (!trimmed) return "PAN is required.";
+  const pattern = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
+  if (!pattern.test(trimmed)) {
+    return "Invalid PAN format. Must be 10 characters: 5 letters, 4 digits, 1 letter (e.g., AAAAA0000A).";
+  }
+  return null;
+}
+
+function validateCompanyName(val: string): string | null {
+  const trimmed = val.trim();
+  if (!trimmed) return "Enterprise Legal Name is required.";
+  if (trimmed.length < 3) return "Enterprise Legal Name must be at least 3 characters.";
+  return null;
+}
+
+export default function BidderSubmission() {
+  const {
+    registerVendorBid,
+    customBidders,
+  } = useBidderContext();
+
+  // Navigation tab state: "submit" (file new bid form) or "pending" (clean table of submitted bids)
+  const [activeTab, setActiveTab] = useState<"submit" | "pending">(() => {
+    return customBidders.length > 0 ? "pending" : "submit";
+  });
+
+  const [step, setStep] = useState(0);
+
+  // Form state
   const [formData, setFormData] = useState({
     companyName: "",
     udyam: "",
     gstin: "",
     pan: "",
-    epfoApplicable: false,
-    esicApplicable: false,
-    startupIndia: false,
-    nsic: false,
-    oemAuthorization: false,
-    localContent: "",
     declaration: false,
   });
 
-  // Starts completely empty — NO pre-attached mock files!
+  const [touched, setTouched] = useState({
+    companyName: false,
+    udyam: false,
+    gstin: false,
+    pan: false,
+  });
+
   const [files, setFiles] = useState<Record<string, { name: string; size: number }>>({});
 
-  const update = (key: string, value: string | boolean) =>
-    setFormData((f) => ({ ...f, [key]: value }));
+  const errors = {
+    companyName: touched.companyName ? validateCompanyName(formData.companyName) : null,
+    udyam: touched.udyam ? validateUdyam(formData.udyam) : null,
+    gstin: touched.gstin ? validateGSTIN(formData.gstin) : null,
+    pan: touched.pan ? validatePAN(formData.pan) : null,
+  };
+
+  const isStep0Valid =
+    !validateCompanyName(formData.companyName) &&
+    !validateUdyam(formData.udyam) &&
+    !validateGSTIN(formData.gstin) &&
+    !validatePAN(formData.pan);
+
+  const update = (key: string, value: string | boolean) => {
+    let finalValue = value;
+    if (typeof value === "string" && (key === "udyam" || key === "gstin" || key === "pan")) {
+      finalValue = value.toUpperCase();
+    }
+    setFormData((f) => ({ ...f, [key]: finalValue }));
+  };
+
+  const handleBlur = (field: keyof typeof touched) => {
+    setTouched((t) => ({ ...t, [field]: true }));
+  };
 
   const setFile = (id: string, file: File) =>
     setFiles((f) => ({ ...f, [id]: { name: file.name, size: file.size } }));
 
-  // Helper for quick testing/demoing when evaluator requests sample data
   const handleFillSample = () => {
     setFormData({
       companyName: "Sundaram Industrial Equipments Pvt. Ltd.",
       udyam: "UDYAM-TN-03-0012345",
       gstin: "33AAAAA0000A1Z5",
       pan: "AAAAA0000A",
-      epfoApplicable: true,
-      esicApplicable: true,
-      startupIndia: false,
-      nsic: false,
-      oemAuthorization: currentTender.requirements.requiresOEM,
-      localContent: currentTender.requirements.minLocalContent ? `${currentTender.requirements.minLocalContent + 10}` : "65",
       declaration: true,
+    });
+    setTouched({
+      companyName: true,
+      udyam: true,
+      gstin: true,
+      pan: true,
     });
     setFiles({
       udyamCert: { name: "udyam_registration_cert.pdf", size: 345000 },
       gstCert: { name: "gstn_33AAAAA0000A1Z5.pdf", size: 520000 },
       panCard: { name: "pan_card_copy.pdf", size: 210000 },
       itrProof: { name: "itr_ay_2025_26.pdf", size: 840000 },
-      epfoEsicCert: { name: "epfo_electronic_challan_receipt.pdf", size: 310000 },
-      ...(currentTender.requirements.requiresOEM
-        ? { oemLetter: { name: "oem_authorization_letter.pdf", size: 410000 } }
-        : {}),
     });
   };
 
-  // Helper to clear form back to pristine empty state
   const handleClearForm = () => {
     setFormData({
       companyName: "",
       udyam: "",
       gstin: "",
       pan: "",
-      epfoApplicable: false,
-      esicApplicable: false,
-      startupIndia: false,
-      nsic: false,
-      oemAuthorization: false,
-      localContent: "",
       declaration: false,
+    });
+    setTouched({
+      companyName: false,
+      udyam: false,
+      gstin: false,
+      pan: false,
     });
     setFiles({});
     setStep(0);
   };
 
-  // Dynamically calculate required documents based on statutory selections & tender rules
-  const conditionalDocs = [];
-  if (formData.epfoApplicable || formData.esicApplicable) {
-    conditionalDocs.push({ id: "epfoEsicCert", label: "EPFO & ESIC Active Registration Certificate" });
-  }
-  if (formData.oemAuthorization || currentTender.requirements.requiresOEM) {
-    conditionalDocs.push({ id: "oemLetter", label: "OEM Authorization / Dealership Letter from Primary Manufacturer" });
-  }
-  if (formData.startupIndia || formData.nsic) {
-    conditionalDocs.push({ id: "startupNsicCert", label: "Startup India / NSIC Recognition Certificate" });
-  }
-  const allDocs = [...BASE_DOCS, ...conditionalDocs];
-
-  const canProceedStep0 =
-    Boolean(formData.companyName.trim() && formData.udyam.trim() && formData.gstin.trim() && formData.pan.trim());
-
-  const handleTenderChange = (ref: string) => {
-    setSelectedTenderRef(ref);
-    if (onSelectTender) {
-      onSelectTender(ref);
+  const handleNextFromStep0 = () => {
+    setTouched({
+      companyName: true,
+      udyam: true,
+      gstin: true,
+      pan: true,
+    });
+    if (isStep0Valid) {
+      setStep(1);
     }
   };
 
+  // BACKEND INTEGRATION: Replace with POST /api/vendor/bids
+  // Transmits vendor credentials and attached statutory certificates.
+  // The newly created bid defaults to status "Under Verification" and queues on the Officer Dashboard.
   const handleFinalSubmit = () => {
     if (!formData.declaration) return;
-    const payload: SubmissionPayload = {
+    registerVendorBid({
       companyName: formData.companyName.trim(),
       udyam: formData.udyam.trim(),
       gstin: formData.gstin.trim(),
       pan: formData.pan.trim(),
-      epfoApplicable: formData.epfoApplicable,
-      esicApplicable: formData.esicApplicable,
-      startupIndia: formData.startupIndia,
-      nsic: formData.nsic,
-      oemAuthorization: formData.oemAuthorization,
-      localContent: formData.localContent.trim(),
-      tenderRef: currentTender.ref,
       attachedDocs: Object.keys(files),
-    };
-    setLastSubmission(payload);
-    setSubmitted(true);
+    });
+    handleClearForm();
+    setActiveTab("pending");
   };
-
-  if (submitted) {
-    return <SubmittedView companyName={formData.companyName} tender={currentTender} />;
-  }
 
   return (
     <div className="min-h-screen w-full flex flex-col" style={{ backgroundColor: "#F7F6F2" }}>
-      {/* Header */}
+      {/* Top Header & Navigation Bar */}
       <div
-        className="flex items-center justify-between px-6 md:px-16 py-4 bg-white sticky top-0 z-30"
+        className="flex items-center justify-between px-6 md:px-12 py-3.5 bg-white sticky top-0 z-30"
         style={{ borderBottom: "1px solid #DCD7CB" }}
       >
         <div className="flex items-center gap-3">
-          <Link to="/" className="flex items-center gap-2">
+          <Link to="/" className="flex items-center gap-2 text-inherit no-underline">
             <span style={{ fontFamily: "'Fraunces', serif" }} className="text-2xl font-bold text-[#171E27]">
               BidSure AI
             </span>
+            <span className="text-xs px-2 py-0.5 rounded border border-[#DCD7CB] text-[#5B6B7D]">
+              Vendor Portal
+            </span>
           </Link>
-          <span className="text-xs px-2 py-0.5 rounded border border-[#DCD7CB] text-[#5B6B7D]">
-            Vendor Submission Portal
-          </span>
         </div>
 
-        <div className="flex items-center gap-3">
+        {/* Clean Navigation Controls */}
+        <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={handleFillSample}
-            className="text-xs px-2.5 py-1 rounded border border-[#C8BFAD] text-[#1F7A5C] bg-[#F2F8F5] hover:bg-[#E3EFE9] transition-colors cursor-pointer font-medium"
-            title="Populate sample company details for testing"
+            onClick={() => setActiveTab("submit")}
+            className={`text-xs px-3 py-1.5 rounded font-semibold cursor-pointer transition-colors ${
+              activeTab === "submit"
+                ? "bg-[#171E27] text-white shadow-2xs"
+                : "bg-white border border-[#DCD7CB] text-[#5B6B7D] hover:bg-[#F7F6F2]"
+            }`}
           >
-            Auto-fill Sample Data
+            + Submit New Bid
           </button>
           <button
             type="button"
-            onClick={handleClearForm}
-            className="text-xs px-2.5 py-1 rounded border border-[#DCD7CB] text-[#7C8896] hover:bg-[#EDEAE1] transition-colors cursor-pointer"
-            title="Reset all form fields"
+            onClick={() => setActiveTab("pending")}
+            className={`text-xs px-3 py-1.5 rounded font-semibold cursor-pointer transition-colors ${
+              activeTab === "pending"
+                ? "bg-[#171E27] text-white shadow-2xs"
+                : "bg-white border border-[#DCD7CB] text-[#5B6B7D] hover:bg-[#F7F6F2]"
+            }`}
           >
-            Clear Form
+            Bid Submission ({customBidders.length})
           </button>
-          <Link
-            to="/"
-            className="text-xs px-2.5 py-1 rounded border border-[#DCD7CB] text-[#5B6B7D] hover:bg-[#EDEAE1]"
-          >
-            Cancel &amp; Exit
-          </Link>
+
+          {activeTab === "submit" && (
+            <>
+              <button
+                type="button"
+                onClick={handleFillSample}
+                className="text-xs px-2.5 py-1.5 rounded border border-[#C8BFAD] text-[#1F7A5C] bg-[#F2F8F5] hover:bg-[#E3EFE9] transition-colors cursor-pointer font-medium"
+                title="Populate sample company details"
+              >
+                Auto-fill Sample
+              </button>
+              <button
+                type="button"
+                onClick={handleClearForm}
+                className="text-xs px-2.5 py-1.5 rounded border border-[#DCD7CB] text-[#7C8896] hover:bg-[#EDEAE1] transition-colors cursor-pointer"
+                title="Reset all form fields"
+              >
+                Clear
+              </button>
+            </>
+          )}
         </div>
       </div>
 
-      <div className="flex-1 max-w-3xl mx-auto w-full px-6 py-8">
-        {/* Tender Context & Selector Banner */}
-        <div
-          className="p-5 mb-8 rounded bg-white"
-          style={{ border: "1px solid #DCD7CB" }}
-        >
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
-            <label htmlFor="bidding-tender" className="text-xs font-semibold uppercase tracking-wider text-[#1F7A5C]">
-              Bidding for Tender:
-            </label>
-            <select
-              id="bidding-tender"
-              value={selectedTenderRef}
-              onChange={(e) => handleTenderChange(e.target.value)}
-              className="px-3 py-1.5 text-xs font-semibold rounded bg-[#F4EFE6] border border-[#C8BFAD] text-[#171E27] cursor-pointer"
-            >
-              {TENDERS.map((t) => (
-                <option key={t.ref} value={t.ref}>
-                  {t.ref} — {t.title}
-                </option>
-              ))}
-            </select>
-          </div>
+      {activeTab === "pending" ? (
+        <SubmittedBidsTable
+          bidders={customBidders}
+          onNewBid={() => {
+            handleClearForm();
+            setActiveTab("submit");
+          }}
+        />
+      ) : (
+        <div className="flex-1 max-w-3xl mx-auto w-full px-6 py-8">
+          <Stepper steps={STEPS} current={step} />
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 border-t border-[#EDEAE1] text-xs">
-            <div>
-              <span className="text-[#8A96A3] block">Procuring Entity</span>
-              <span className="font-semibold text-[#171E27]">{currentTender.department}</span>
-            </div>
-            <div>
-              <span className="text-[#8A96A3] block">Min. Local Content (MII)</span>
-              <span className="font-semibold text-[#171E27]">{currentTender.requirements.minLocalContent}% Required</span>
-            </div>
-            <div>
-              <span className="text-[#8A96A3] block">OEM Authorization</span>
-              <span className={`font-semibold ${currentTender.requirements.requiresOEM ? "text-[#95601F]" : "text-[#171E27]"}`}>
-                {currentTender.requirements.requiresOEM ? "Mandatory for this Category" : "Standard Reseller Allowed"}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <Stepper steps={STEPS} current={step} />
-
-        {step === 0 && <StepBusiness formData={formData} update={update} />}
-        {step === 1 && (
-          <StepStatutory
+        {step === 0 && (
+          <StepBusiness
             formData={formData}
             update={update}
-            tender={currentTender}
+            errors={errors}
+            onBlur={handleBlur}
           />
         )}
-        {step === 2 && (
+        {step === 1 && (
           <StepDocuments
-            docs={allDocs}
+            docs={BASE_DOCS}
             files={files}
             setFile={setFile}
             onAttachDemoDocs={() => {
-              const sampleFiles: Record<string, { name: string; size: number }> = {
+              setFiles({
                 udyamCert: { name: "udyam_registration_cert.pdf", size: 345000 },
                 gstCert: { name: "gstn_certificate_33.pdf", size: 520000 },
                 panCard: { name: "pan_card_copy.pdf", size: 210000 },
                 itrProof: { name: "itr_ay_2025_26.pdf", size: 840000 },
-              };
-              if (formData.epfoApplicable || formData.esicApplicable) {
-                sampleFiles.epfoEsicCert = { name: "epfo_electronic_challan.pdf", size: 310000 };
-              }
-              if (formData.oemAuthorization || currentTender.requirements.requiresOEM) {
-                sampleFiles.oemLetter = { name: "oem_dealership_auth.pdf", size: 410000 };
-              }
-              if (formData.startupIndia || formData.nsic) {
-                sampleFiles.startupNsicCert = { name: "startup_india_dpiit.pdf", size: 290000 };
-              }
-              setFiles((prev) => ({ ...prev, ...sampleFiles }));
+              });
             }}
           />
         )}
-        {step === 3 && (
+        {step === 2 && (
           <StepReview
             formData={formData}
             update={update}
             files={files}
-            allDocs={allDocs}
-            tender={currentTender}
+            allDocs={BASE_DOCS}
           />
         )}
 
@@ -293,16 +304,22 @@ export default function BidderSubmission({
             &larr; Previous Step
           </button>
 
-          {step < STEPS.length - 1 ? (
+          {step === 0 ? (
             <button
               type="button"
-              onClick={() => setStep((s) => s + 1)}
-              disabled={step === 0 && !canProceedStep0}
-              className="px-6 py-2.5 text-sm font-medium rounded transition-colors cursor-pointer shadow-xs"
+              onClick={handleNextFromStep0}
+              className="px-6 py-2.5 text-sm font-semibold rounded transition-colors cursor-pointer shadow-xs text-white"
               style={{
-                backgroundColor: step === 0 && !canProceedStep0 ? "#C9C2B2" : "#0F1B2D",
-                color: "#F7F6F2",
+                backgroundColor: isStep0Valid ? "#0F1B2D" : "#8A96A3",
               }}
+            >
+              Continue &rarr;
+            </button>
+          ) : step === 1 ? (
+            <button
+              type="button"
+              onClick={() => setStep(2)}
+              className="px-6 py-2.5 text-sm font-semibold rounded transition-colors cursor-pointer shadow-xs bg-[#0F1B2D] text-white"
             >
               Continue &rarr;
             </button>
@@ -311,17 +328,18 @@ export default function BidderSubmission({
               type="button"
               onClick={handleFinalSubmit}
               disabled={!formData.declaration}
-              className="px-6 py-2.5 text-sm font-medium rounded transition-colors cursor-pointer shadow-sm"
+              className="px-6 py-2.5 text-sm font-semibold rounded transition-colors cursor-pointer shadow-xs"
               style={{
-                backgroundColor: formData.declaration ? "#1F7A5C" : "#C9C2B2",
-                color: "#F7F6F2",
+                backgroundColor: formData.declaration ? "#1F7A5C" : "#A3B8B0",
+                color: "#FFFFFF",
               }}
             >
-              Submit for AI Verification
+              Submit Bid
             </button>
           )}
         </div>
       </div>
+      )}
 
       <Footer />
     </div>
@@ -330,42 +348,29 @@ export default function BidderSubmission({
 
 function Stepper({ steps, current }: { steps: string[]; current: number }) {
   return (
-    <div className="flex items-start mb-8 overflow-x-auto pb-2">
-      {steps.map((label, i) => {
-        const state = i < current ? "done" : i === current ? "active" : "upcoming";
+    <div className="flex items-center justify-between mb-8 pb-4 border-b border-[#DCD7CB]">
+      {steps.map((label, idx) => {
+        const done = idx < current;
+        const active = idx === current;
         return (
-          <div key={label} className="flex items-start flex-1 last:flex-none">
-            <div className="flex flex-col items-center" style={{ minWidth: 96 }}>
-              <div
-                className="flex items-center justify-center rounded-full text-xs font-semibold"
-                style={{
-                  width: 28,
-                  height: 28,
-                  border: `1.5px solid ${state === "upcoming" ? "#C9C2B2" : "#1F7A5C"}`,
-                  backgroundColor: state === "done" ? "#1F7A5C" : "transparent",
-                  color: state === "done" ? "#F7F6F2" : state === "active" ? "#1F7A5C" : "#9B9285",
-                }}
-              >
-                {state === "done" ? (
-                  <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
-                    <path d="M1 4L3.5 6.5L9 1" stroke="#F7F6F2" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                ) : (
-                  i + 1
-                )}
-              </div>
-              <span
-                className="mt-1.5 text-xs text-center font-medium"
-                style={{ color: state === "upcoming" ? "#9B9285" : "#171E27", maxWidth: 110 }}
-              >
-                {label}
-              </span>
-            </div>
-            {i < steps.length - 1 && (
-              <div
-                className="flex-1 h-px mx-2"
-                style={{ backgroundColor: i < current ? "#1F7A5C" : "#DCD7CB", marginTop: 14 }}
-              />
+          <div key={label} className="flex items-center gap-2">
+            <span
+              className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-colors"
+              style={{
+                backgroundColor: done ? "#1F7A5C" : active ? "#0F1B2D" : "#EDEAE1",
+                color: done || active ? "#FFFFFF" : "#8A96A3",
+              }}
+            >
+              {done ? "✓" : idx + 1}
+            </span>
+            <span
+              className="text-xs font-semibold hidden sm:inline"
+              style={{ color: active ? "#0F1B2D" : done ? "#1F7A5C" : "#8A96A3" }}
+            >
+              {label}
+            </span>
+            {idx < steps.length - 1 && (
+              <span className="w-8 md:w-16 h-px bg-[#DCD7CB] mx-1" />
             )}
           </div>
         );
@@ -377,117 +382,132 @@ function Stepper({ steps, current }: { steps: string[]; current: number }) {
 function StepBusiness({
   formData,
   update,
+  errors,
+  onBlur,
 }: {
-  formData: any;
+  formData: { companyName: string; udyam: string; gstin: string; pan: string };
   update: (k: string, v: string) => void;
+  errors: {
+    companyName: string | null;
+    udyam: string | null;
+    gstin: string | null;
+    pan: string | null;
+  };
+  onBlur: (field: "companyName" | "udyam" | "gstin" | "pan") => void;
 }) {
   return (
-    <div className="p-6 md:p-8 rounded bg-white" style={{ border: "1px solid #DCD7CB" }}>
-      <h2 style={{ fontFamily: "'Fraunces', serif", color: "#171E27" }} className="text-2xl mb-1 font-semibold">
-        Business Details
-      </h2>
-      <p className="text-sm mb-6" style={{ color: "#5B6B7D" }}>
-        Enter official registration identifiers for automated cross-portal verification against Udyam, GSTN, and Income Tax records.
-      </p>
-      <div className="space-y-5">
-        <Field
-          label="Company / Enterprise Legal Name"
+    <div className="space-y-6 bg-white p-6 md:p-8 rounded border border-[#DCD7CB] shadow-xs">
+      <div>
+        <h2 style={{ fontFamily: "'Fraunces', serif" }} className="text-xl font-bold text-[#171E27] mb-1">
+          Business Details &amp; Statutory Identifiers
+        </h2>
+        <p className="text-xs text-[#5B6B7D]">
+          Enter your registered enterprise details. Ensure all identification numbers follow national statutory formats.
+        </p>
+      </div>
+
+      <div className="space-y-4">
+        {/* Enterprise Legal Name */}
+        <ValidatedField
+          label="Enterprise / Company Legal Name"
           value={formData.companyName}
           onChange={(v) => update("companyName", v)}
-          placeholder="Enter registered entity name (e.g. Apex Engineering Solutions Pvt. Ltd.)"
+          onBlur={() => onBlur("companyName")}
+          error={errors.companyName}
+          placeholder="e.g., Sundaram Industrial Equipments Pvt. Ltd."
+          hint="Must match exactly with the legal registration certificates."
         />
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          <Field
-            label="Udyam Registration Number"
-            value={formData.udyam}
-            onChange={(v) => update("udyam", v)}
-            placeholder="e.g. UDYAM-TN-03-0012345"
-            hint="For MSME classification & statutory exemptions"
-          />
-          <Field
-            label="GSTIN (15 Characters)"
-            value={formData.gstin}
-            onChange={(v) => update("gstin", v)}
-            placeholder="e.g. 33AAAAA0000A1Z5"
-            hint="Validated against GSTN return logs"
-          />
-        </div>
-        <Field
+
+        {/* Udyam Registration Number */}
+        <ValidatedField
+          label="Udyam / MSME Registration Number"
+          value={formData.udyam}
+          onChange={(v) => update("udyam", v)}
+          onBlur={() => onBlur("udyam")}
+          error={errors.udyam}
+          placeholder="UDYAM-TN-03-0012345"
+          hint="Required syntax: UDYAM-XX-00-0000000 (Ministry of MSME format)."
+        />
+
+        {/* GSTIN */}
+        <ValidatedField
+          label="GSTIN (Goods and Services Tax Identification Number)"
+          value={formData.gstin}
+          onChange={(v) => update("gstin", v)}
+          onBlur={() => onBlur("gstin")}
+          error={errors.gstin}
+          placeholder="33AAAAA0000A1Z5"
+          hint="Standard 15-character statutory GST identification code."
+        />
+
+        {/* PAN */}
+        <ValidatedField
           label="Permanent Account Number (PAN)"
           value={formData.pan}
           onChange={(v) => update("pan", v)}
-          placeholder="e.g. AAAAA0000A"
-          hint="Matched with MCA21 and CBDT master database"
+          onBlur={() => onBlur("pan")}
+          error={errors.pan}
+          placeholder="AAAAA0000A"
+          hint="10-character alphanumeric PAN issued by Income Tax Department."
         />
       </div>
     </div>
   );
 }
 
-function StepStatutory({
-  formData,
-  update,
-  tender,
+function ValidatedField({
+  label,
+  value,
+  onChange,
+  onBlur,
+  error,
+  placeholder,
+  hint,
 }: {
-  formData: any;
-  update: (k: string, v: any) => void;
-  tender: Tender;
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  onBlur: () => void;
+  error: string | null;
+  placeholder?: string;
+  hint?: string;
 }) {
   return (
-    <div className="p-6 md:p-8 rounded bg-white" style={{ border: "1px solid #DCD7CB" }}>
-      <h2 style={{ fontFamily: "'Fraunces', serif", color: "#171E27" }} className="text-2xl mb-1 font-semibold">
-        Statutory & Certifications
-      </h2>
-      <p className="text-sm mb-6" style={{ color: "#5B6B7D" }}>
-        Select statutory provisions applicable to your organization. The system dynamically updates required document attachments.
-      </p>
-
-      <div className="space-y-3">
-        <Toggle
-          label="Registered under EPFO"
-          description="Employees' Provident Fund Organisation registration validation"
-          checked={formData.epfoApplicable}
-          onChange={(v) => update("epfoApplicable", v)}
-        />
-        <Toggle
-          label="Registered under ESIC"
-          description="Employees' State Insurance Corporation compliance validation"
-          checked={formData.esicApplicable}
-          onChange={(v) => update("esicApplicable", v)}
-        />
-        <Toggle
-          label="DPIIT Recognized Startup"
-          description="Exemption eligibility for prior turnover/experience under Startup India"
-          checked={formData.startupIndia}
-          onChange={(v) => update("startupIndia", v)}
-        />
-        <Toggle
-          label="National Small Industries Corporation (NSIC) Enrolled"
-          description="Additional benefits for government procurement participation"
-          checked={formData.nsic}
-          onChange={(v) => update("nsic", v)}
-        />
-        <Toggle
-          label={
-            tender.requirements.requiresOEM
-              ? "OEM Manufacturer Authorization (Mandatory for this Tender)"
-              : "OEM Manufacturer Authorization / Dealership"
+    <div className="block">
+      <div className="flex items-center justify-between mb-1">
+        <label className="text-xs font-semibold text-[#171E27]">{label}</label>
+        {error && (
+          <span className="text-[11px] font-medium text-[#B23A3A] flex items-center gap-1">
+            ⚠ Required format
+          </span>
+        )}
+      </div>
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onBlur={onBlur}
+        placeholder={placeholder}
+        className="w-full px-3.5 py-2.5 text-sm rounded outline-none transition-all"
+        style={{
+          border: error ? "1.5px solid #D32F2F" : "1px solid #DCD7CB",
+          backgroundColor: error ? "#FFF8F8" : "#FFFFFF",
+          color: "#171E27",
+        }}
+        onFocus={(e) => {
+          if (!error) {
+            e.target.style.borderColor = "#1F7A5C";
+            e.target.style.boxShadow = "0 0 0 2px rgba(31,122,92,0.15)";
           }
-          description="Original equipment manufacturer authorization or primary dealership credentials"
-          checked={formData.oemAuthorization}
-          onChange={(v) => update("oemAuthorization", v)}
-        />
-      </div>
-
-      <div className="mt-6 pt-6 border-t border-[#EDEAE1]">
-        <Field
-          label="Declared Make in India / Local Content (%)"
-          value={formData.localContent}
-          onChange={(v) => update("localContent", v)}
-          placeholder={`Minimum ${tender.requirements.minLocalContent}% required for ${tender.ref}`}
-          hint={`Active Tender Requirement: Minimum ${tender.requirements.minLocalContent}%. If below, BidSure AI flags a local content mismatch.`}
-        />
-      </div>
+        }}
+      />
+      {error ? (
+        <p className="text-xs font-medium text-[#D32F2F] mt-1.5 flex items-center gap-1">
+          <span>{error}</span>
+        </p>
+      ) : hint ? (
+        <span className="block text-xs mt-1 text-[#8A96A3]">{hint}</span>
+      ) : null}
     </div>
   );
 }
@@ -503,23 +523,21 @@ function StepDocuments({
   setFile: (id: string, file: File) => void;
   onAttachDemoDocs: () => void;
 }) {
-  const uploadedCount = docs.filter((d) => files[d.id]).length;
-
   return (
-    <div className="p-6 md:p-8 rounded bg-white" style={{ border: "1px solid #DCD7CB" }}>
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+    <div className="space-y-6 bg-white p-6 md:p-8 rounded border border-[#DCD7CB] shadow-xs">
+      <div className="flex items-start justify-between gap-4">
         <div>
-          <h2 style={{ fontFamily: "'Fraunces', serif", color: "#171E27" }} className="text-2xl mb-1 font-semibold">
-            Upload Verification Documents
+          <h2 style={{ fontFamily: "'Fraunces', serif" }} className="text-xl font-bold text-[#171E27] mb-1">
+            Document Uploads
           </h2>
-          <p className="text-sm" style={{ color: "#5B6B7D" }}>
-            Upload PDF credentials or authenticate certificates. {uploadedCount} of {docs.length} attached.
+          <p className="text-xs text-[#5B6B7D]">
+            Upload the statutory certificates corresponding to your business registration.
           </p>
         </div>
         <button
           type="button"
           onClick={onAttachDemoDocs}
-          className="text-xs px-3 py-1.5 rounded font-medium text-[#1F7A5C] bg-[#F2F8F5] border border-[#C8BFAD] hover:bg-[#E3EFE9] transition-colors cursor-pointer self-start sm:self-auto"
+          className="text-xs px-3 py-1.5 rounded font-semibold text-[#1F7A5C] bg-[#EEF5F1] border border-[#BDE0D2] hover:bg-[#E0F0E8] cursor-pointer transition-colors"
         >
           Attach Demo PDFs
         </button>
@@ -527,133 +545,16 @@ function StepDocuments({
 
       <div className="space-y-3">
         {docs.map((d) => (
-          <DocumentRow key={d.id} id={d.id} label={d.label} file={files[d.id]} onFile={setFile} />
+          <DocumentRow
+            key={d.id}
+            id={d.id}
+            label={d.label}
+            file={files[d.id]}
+            onFile={setFile}
+          />
         ))}
       </div>
     </div>
-  );
-}
-
-function StepReview({
-  formData,
-  update,
-  files,
-  allDocs,
-  tender,
-}: {
-  formData: any;
-  update: (k: string, v: boolean) => void;
-  files: Record<string, { name: string; size: number }>;
-  allDocs: any[];
-  tender: Tender;
-}) {
-  const attachedCount = allDocs.filter((d) => files[d.id]).length;
-
-  return (
-    <div className="p-6 md:p-8 rounded bg-white" style={{ border: "1px solid #DCD7CB" }}>
-      <h2 style={{ fontFamily: "'Fraunces', serif", color: "#171E27" }} className="text-2xl mb-1 font-semibold">
-        Review &amp; Statutory Declaration
-      </h2>
-      <p className="text-sm mb-6" style={{ color: "#5B6B7D" }}>
-        Review your declarations before submitting for automated AI cross-verification.
-      </p>
-
-      <div className="p-4 rounded mb-6 grid grid-cols-1 md:grid-cols-2 gap-4 text-xs bg-[#FAF9F6] border border-[#DCD7CB]">
-        <ReviewItem label="Enterprise Name" value={formData.companyName || "Not provided"} />
-        <ReviewItem label="Udyam Number" value={formData.udyam || "Not provided"} />
-        <ReviewItem label="GSTIN" value={formData.gstin || "Not provided"} />
-        <ReviewItem label="PAN" value={formData.pan || "Not provided"} />
-        <ReviewItem
-          label="Declared Local Content"
-          value={formData.localContent ? `${formData.localContent}% (Tender req: ${tender.requirements.minLocalContent}%)` : "Not provided"}
-        />
-        <ReviewItem label="Attached Documents" value={`${attachedCount} of ${allDocs.length} files attached`} />
-      </div>
-
-      <Toggle
-        label="Statutory Truth & Authorization Declaration"
-        description="I declare that all information and uploaded documents provided are authentic and accurate. I authorize automated validation against Udyam, GSTN, Income Tax, EPFO, ESIC, CPPP Debarment, and DigiLocker databases for GeM evaluation."
-        checked={formData.declaration}
-        onChange={(v) => update("declaration", v)}
-      />
-    </div>
-  );
-}
-
-function Field({
-  label,
-  value,
-  onChange,
-  placeholder,
-  hint,
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  placeholder?: string;
-  hint?: string;
-}) {
-  return (
-    <label className="block">
-      <span className="block text-xs font-medium mb-1.5 text-[#5B6B7D]">{label}</span>
-      <input
-        type="text"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        className="w-full px-3.5 py-2.5 text-sm rounded outline-none transition-all"
-        style={{ border: "1px solid #DCD7CB", backgroundColor: "#FFFFFF", color: "#171E27" }}
-        onFocus={(e) => {
-          e.target.style.borderColor = "#1F7A5C";
-          e.target.style.boxShadow = "0 0 0 2px rgba(31,122,92,0.15)";
-        }}
-        onBlur={(e) => {
-          e.target.style.borderColor = "#DCD7CB";
-          e.target.style.boxShadow = "none";
-        }}
-      />
-      {hint && <span className="block text-xs mt-1 text-[#8A96A3]">{hint}</span>}
-    </label>
-  );
-}
-
-function Toggle({
-  label,
-  description,
-  checked,
-  onChange,
-}: {
-  label: string;
-  description?: string;
-  checked: boolean;
-  onChange: (v: boolean) => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={() => onChange(!checked)}
-      className="w-full flex items-start gap-3 p-4 rounded text-left transition-colors cursor-pointer"
-      style={{
-        border: `1px solid ${checked ? "#1F7A5C" : "#DCD7CB"}`,
-        backgroundColor: checked ? "#EEF5F1" : "#FFFFFF",
-      }}
-    >
-      <span
-        className="mt-0.5 flex items-center justify-center flex-shrink-0 rounded-xs"
-        style={{
-          width: 18,
-          height: 18,
-          border: `1.5px solid ${checked ? "#1F7A5C" : "#A8B4C0"}`,
-          backgroundColor: checked ? "#1F7A5C" : "transparent",
-        }}
-      >
-        {checked && <CheckIcon small color="#FFFFFF" />}
-      </span>
-      <div>
-        <span className="block text-sm font-semibold text-[#171E27]">{label}</span>
-        {description && <span className="block text-xs mt-0.5 text-[#5B6B7D] leading-snug">{description}</span>}
-      </div>
-    </button>
   );
 }
 
@@ -663,7 +564,6 @@ function DocumentRow({
   file,
   onFile,
 }: {
-  key?: string;
   id: string;
   label: string;
   file?: { name: string; size: number };
@@ -710,48 +610,322 @@ function DocumentRow({
   );
 }
 
-function ReviewItem({ label, value }: { label: string; value: string }) {
+function StepReview({
+  formData,
+  update,
+  files,
+  allDocs,
+}: {
+  formData: { companyName: string; udyam: string; gstin: string; pan: string; declaration: boolean };
+  update: (k: string, v: boolean) => void;
+  files: Record<string, { name: string; size: number }>;
+  allDocs: { id: string; label: string }[];
+}) {
+  const uploadedCount = Object.keys(files).length;
+
   return (
-    <div>
-      <p className="text-xs mb-0.5 text-[#8A96A3]">{label}</p>
-      <p className="font-semibold text-[#171E27]">{value}</p>
+    <div className="space-y-6 bg-white p-6 md:p-8 rounded border border-[#DCD7CB] shadow-xs">
+      <div>
+        <h2 style={{ fontFamily: "'Fraunces', serif" }} className="text-xl font-bold text-[#171E27] mb-1">
+          Review &amp; Submit
+        </h2>
+        <p className="text-xs text-[#5B6B7D]">
+          Verify all entered details and confirm statutory authenticity before final submission.
+        </p>
+      </div>
+
+      <div className="p-4 rounded bg-[#FAF9F6] border border-[#EDEAE1] space-y-3">
+        <h3 className="text-xs font-bold uppercase tracking-wider text-[#5B6B7D]">Enterprise Summary</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+          <div>
+            <span className="text-[#8A96A3] block">Company Name</span>
+            <span className="font-semibold text-[#171E27]">{formData.companyName}</span>
+          </div>
+          <div>
+            <span className="text-[#8A96A3] block">Udyam Registration</span>
+            <span className="font-semibold font-mono text-[#171E27]">{formData.udyam}</span>
+          </div>
+          <div>
+            <span className="text-[#8A96A3] block">GSTIN</span>
+            <span className="font-semibold font-mono text-[#171E27]">{formData.gstin}</span>
+          </div>
+          <div>
+            <span className="text-[#8A96A3] block">PAN</span>
+            <span className="font-semibold font-mono text-[#171E27]">{formData.pan}</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="p-4 rounded bg-[#FAF9F6] border border-[#EDEAE1] space-y-2">
+        <h3 className="text-xs font-bold uppercase tracking-wider text-[#5B6B7D]">
+          Attached Certificates ({uploadedCount} of {allDocs.length})
+        </h3>
+        <div className="space-y-1 text-xs">
+          {allDocs.map((doc) => {
+            const f = files[doc.id];
+            return (
+              <div key={doc.id} className="flex items-center justify-between py-1 border-b border-[#EDEAE1] last:border-b-0">
+                <span className="text-[#171E27]">{doc.label}</span>
+                <span className="font-medium" style={{ color: f ? "#1F7A5C" : "#9B9285" }}>
+                  {f ? `✓ ${f.name}` : "Not attached"}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Statutory Undertaking */}
+      <button
+        type="button"
+        onClick={() => update("declaration", !formData.declaration)}
+        className="w-full flex items-start gap-3 p-4 rounded text-left transition-colors cursor-pointer"
+        style={{
+          border: `1px solid ${formData.declaration ? "#1F7A5C" : "#DCD7CB"}`,
+          backgroundColor: formData.declaration ? "#EEF5F1" : "#FFFFFF",
+        }}
+      >
+        <span
+          className="mt-0.5 flex items-center justify-center flex-shrink-0 rounded-xs"
+          style={{
+            width: 18,
+            height: 18,
+            border: `1.5px solid ${formData.declaration ? "#1F7A5C" : "#A8B4C0"}`,
+            backgroundColor: formData.declaration ? "#1F7A5C" : "transparent",
+          }}
+        >
+          {formData.declaration && <CheckIcon small color="#FFFFFF" />}
+        </span>
+        <div>
+          <span className="block text-xs font-bold text-[#171E27]">
+            Statutory Undertaking &amp; Declaration
+          </span>
+          <span className="block text-[11px] mt-0.5 text-[#5B6B7D] leading-snug">
+            I hereby solemnly declare that all statements made and documents uploaded are authentic, accurate, and valid under the Government e-Marketplace (GeM) General Terms and Conditions.
+          </span>
+        </div>
+      </button>
     </div>
   );
 }
 
-function SubmittedView({ companyName, tender }: { companyName: string; tender: Tender }) {
-  const navigate = useNavigate();
-  return (
-    <div className="min-h-screen w-full flex flex-col" style={{ backgroundColor: "#0F1B2D" }}>
-      <div className="flex-1 flex items-center justify-center p-6">
-        <div className="text-center max-w-md w-full p-8 rounded bg-[#132234] border border-[#263749]">
-          <div className="flex justify-center mb-6">
-            <BigCheckIcon size={52} />
-          </div>
-          <span className="text-xs font-semibold uppercase tracking-wider text-[#4FA37C] block mb-2">
-            Submission Acknowledged
-          </span>
-          <h1 style={{ fontFamily: "'Fraunces', serif", color: "#F2EFE9" }} className="text-2xl md:text-3xl mb-3 font-semibold">
-            Ready for Automated AI Verification
-          </h1>
-          <p className="text-sm leading-relaxed text-[#B8C2CE]">
-            <span className="text-white font-medium">{companyName}</span> has submitted statutory credentials for tender{" "}
-            <span className="text-[#68BA97] font-mono">{tender.ref}</span> ({tender.title}).
-          </p>
-          <p className="text-xs text-[#8A96A3] mt-3">
-            BidSure AI will cross-verify documents against Udyam, GSTN, Income Tax, EPFO/ESIC, Startup India, and DigiLocker databases in real time.
-          </p>
+// BACKEND INTEGRATION: Clean Tabular Listing of Submitted Bids
+// Displays all submitted vendor tenders with live verification status from the procurement officer
+function SubmittedBidsTable({
+  bidders,
+  onNewBid,
+}: {
+  bidders: any[];
+  onNewBid: () => void;
+}) {
+  const getStatusBadge = (b: any) => {
+    const isVer = b.status === "Verified" || b.officerDecision === "Verified";
+    const isRej = b.status === "Rejected" || b.officerDecision === "Rejected";
+    const isDocReq = b.status === "Documents Requested" || b.officerDecision === "Documents Requested";
 
+    if (isVer) {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-bold bg-[#EEF5F1] text-[#1F7A5C] border border-[#BDE0D2]">
+          <span className="w-1.5 h-1.5 rounded-full bg-[#1F7A5C]" />
+          Verified
+        </span>
+      );
+    }
+    if (isRej) {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-bold bg-[#FDF2F2] text-[#B23A3A] border border-[#F5C2C2]">
+          <span className="w-1.5 h-1.5 rounded-full bg-[#B23A3A]" />
+          Rejected
+        </span>
+      );
+    }
+    if (isDocReq) {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-bold bg-[#FFF6EB] text-[#B8752E] border border-[#F5D6B3]">
+          <span className="w-1.5 h-1.5 rounded-full bg-[#B8752E]" />
+          Documents Requested
+        </span>
+      );
+    }
+    return (
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-bold bg-[#FFF8E7] text-[#9C731A] border border-[#F0DA9B]">
+        <span className="w-1.5 h-1.5 rounded-full bg-[#D4A038] animate-pulse" />
+        Pending Verification
+      </span>
+    );
+  };
+
+  if (!bidders || bidders.length === 0) {
+    return (
+      <div className="flex-1 max-w-3xl w-full mx-auto px-6 py-16 text-center">
+        <div className="bg-white rounded border border-[#DCD7CB] p-10 shadow-2xs">
+          <h2 style={{ fontFamily: "'Fraunces', serif" }} className="text-xl font-bold text-[#171E27] mb-2">
+            No Submitted Bids Yet
+          </h2>
+          <p className="text-xs text-[#5B6B7D] max-w-md mx-auto mb-6 leading-relaxed">
+            Fill out the 3-step tender bid submission form to submit your statutory credentials for procurement officer verification.
+          </p>
           <button
-            onClick={() => navigate("/bidder/verifying")}
-            className="mt-8 w-full py-3 text-sm font-semibold rounded cursor-pointer transition-all shadow-md"
-            style={{ backgroundColor: "#1F7A5C", color: "#F7F6F2" }}
+            type="button"
+            onClick={onNewBid}
+            className="px-5 py-2.5 rounded bg-[#171E27] text-white text-xs font-semibold hover:bg-[#2A3747] transition-colors cursor-pointer"
           >
-            Start Real-Time AI Verification &rarr;
+            + Submit New Bid
           </button>
         </div>
       </div>
-      <Footer dark />
+    );
+  }
+
+  return (
+    <div className="flex-1 max-w-5xl w-full mx-auto px-6 md:px-8 py-8">
+      {/* Title & Action */}
+      <div className="mb-6 flex items-center justify-between gap-4">
+        <div>
+          <h1
+            style={{ fontFamily: "'Fraunces', serif", color: "#171E27" }}
+            className="text-2xl md:text-3xl font-bold"
+          >
+            Bid Submission
+          </h1>
+          <p className="text-xs text-[#5B6B7D] mt-1">
+            Official GeM tender submissions. Status reflects procurement officer evaluation in real-time.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onNewBid}
+          className="text-xs font-semibold px-4 py-2 rounded bg-[#171E27] text-white hover:bg-[#2A3747] transition-colors cursor-pointer shadow-2xs whitespace-nowrap"
+        >
+          + Submit Another Bid
+        </button>
+      </div>
+
+      {/* Clean Tabular Listing */}
+      <div className="rounded overflow-hidden bg-white border border-[#DCD7CB] shadow-2xs">
+        <div className="px-6 py-3.5 bg-[#FAF9F6] border-b border-[#DCD7CB] flex items-center justify-between">
+          <h2 className="text-xs font-bold uppercase tracking-wider text-[#171E27]">
+            Bid Submission ({bidders.length})
+          </h2>
+          <span className="text-[11px] text-[#8A96A3]">
+            GeM Verification Queue
+          </span>
+        </div>
+
+        <table className="w-full text-sm" style={{ borderCollapse: "collapse" }}>
+          <thead>
+            <tr className="bg-[#FAF9F6] border-b border-[#EDEAE1]">
+              <th className="px-6 py-3.5 text-left text-xs font-semibold text-[#5B6B7D] uppercase tracking-wider w-5/12">
+                Enterprise Name
+              </th>
+              <th className="px-6 py-3.5 text-left text-xs font-semibold text-[#5B6B7D] uppercase tracking-wider w-7/12">
+                Current Status
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {bidders.map((b) => {
+              const refId = `GEM/2026/B-${b.id.replace("bidder-", "").slice(-5) || "08192"}`;
+              const isVerified = b.status === "Verified" || b.officerDecision === "Verified";
+              const isRejected = b.status === "Rejected" || b.officerDecision === "Rejected";
+              const isDocRequested = b.status === "Documents Requested" || b.officerDecision === "Documents Requested";
+              const hasOfficerNotice = Boolean(b.feedbackMessage || isVerified || isRejected || isDocRequested);
+
+              return (
+                <Fragment key={b.id}>
+                  <tr
+                    className={`transition-colors hover:bg-[#F9F8F5] ${
+                      hasOfficerNotice ? "border-b-0" : "border-b border-[#EDEAE1]"
+                    }`}
+                  >
+                    <td className="px-6 py-4">
+                      <span className="font-semibold text-[#171E27] block text-base">
+                        {b.name}
+                      </span>
+                      <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 mt-1 text-xs text-[#5B6B7D]">
+                        <span className="font-mono text-[#8A96A3]">
+                          {refId}
+                        </span>
+                        <span>•</span>
+                        <span>
+                          {b.submittedAt ? `Submitted ${b.submittedAt}` : "Submitted Today"}
+                        </span>
+                        {b.udyam && (
+                          <>
+                            <span>•</span>
+                            <span>Udyam: <span className="font-mono text-[#171E27]">{b.udyam}</span></span>
+                          </>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-left">
+                      {getStatusBadge(b)}
+                    </td>
+                  </tr>
+
+                  {/* Officer Notice on Separate Row */}
+                  {hasOfficerNotice && (
+                    <tr className="border-b border-[#EDEAE1] bg-[#FAF9F6]">
+                      <td colSpan={2} className="px-6 pb-4 pt-1">
+                        <div
+                          className="text-xs p-3 rounded border w-full leading-relaxed"
+                          style={{
+                            backgroundColor: isVerified
+                              ? "#F0F8F4"
+                              : isRejected
+                              ? "#FDF3F3"
+                              : isDocRequested
+                              ? "#FFF9F0"
+                              : "#FFFFFF",
+                            borderColor: isVerified
+                              ? "#BDE0D2"
+                              : isRejected
+                              ? "#F5C2C2"
+                              : isDocRequested
+                              ? "#F5D6B3"
+                              : "#DCD7CB",
+                          }}
+                        >
+                          <span
+                            className="font-bold text-[11px] uppercase tracking-wider block mb-1"
+                            style={{
+                              color: isVerified
+                                ? "#1F7A5C"
+                                : isRejected
+                                ? "#B23A3A"
+                                : isDocRequested
+                                ? "#B8752E"
+                                : "#5B6B7D",
+                            }}
+                          >
+                            {isVerified
+                              ? "Officer Verification Cleared:"
+                              : isRejected
+                              ? "Officer Disqualification Notice:"
+                              : isDocRequested
+                              ? "Officer Document Request:"
+                              : "Officer Response:"}
+                          </span>
+                          <p className="text-xs text-[#334155]">
+                            {b.feedbackMessage ||
+                              (isVerified
+                                ? "All statutory credentials and certificates verified and accepted by the Procurement Officer."
+                                : isRejected
+                                ? "Disqualified by Procurement Officer due to statutory non-compliance or discrepancy."
+                                : isDocRequested
+                                ? "Notice: Supplementary statutory certificates requested."
+                                : "Awaiting Procurement Officer document verification.")}
+                          </p>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
