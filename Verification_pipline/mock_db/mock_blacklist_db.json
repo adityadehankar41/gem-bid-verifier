@@ -1,0 +1,29 @@
+{
+  "cvc_debarment_list": [
+    {
+      "pan": "LMNOC9012Q",
+      "gstin": null,
+      "name": "Fake Traders Pvt Ltd",
+      "reason": "Contract fraud",
+      "debarred_till": "2028-01-01"
+    }
+  ],
+  "cpcl_internal_blacklist": [
+    {
+      "pan": null,
+      "gstin": "07LMNOC9012Q1Z8",
+      "name": "Fake Traders Pvt Ltd",
+      "reason": "Repeated quality failures",
+      "debarred_till": "2027-06-01"
+    }
+  ],
+  "gem_suspended_sellers": [
+    {
+      "pan": "PQRSX5678K",
+      "gstin": null,
+      "name": "XYZ Enterprises",
+      "reason": "Platform policy violation",
+      "debarred_till": "2026-12-31"
+    }
+  ]
+}

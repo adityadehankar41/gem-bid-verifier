@@ -1,0 +1,42 @@
+[
+  {
+    "label": "Case 1: Clean bidder, no matches anywhere",
+    "input": {
+      "pan_no": "ABCPT1234F",
+      "gstin": "27ABCPT1234F1Z5",
+      "name": "ABC Traders"
+    }
+  },
+  {
+    "label": "Case 2: PAN match on CVC debarment list",
+    "input": {
+      "pan_no": "LMNOC9012Q",
+      "gstin": "07LMNOC9012Q1Z8",
+      "name": "Fake Traders Pvt Ltd"
+    }
+  },
+  {
+    "label": "Case 3: GSTIN match on CPCL internal blacklist only",
+    "input": {
+      "pan_no": "ZZZZZ0000Z",
+      "gstin": "07LMNOC9012Q1Z8",
+      "name": "Fake Traders Pvt Ltd"
+    }
+  },
+  {
+    "label": "Case 4: Name-only match on GeM suspended sellers list",
+    "input": {
+      "pan_no": "AAAAA0000A",
+      "gstin": null,
+      "name": "XYZ Enterprises"
+    }
+  },
+  {
+    "label": "Case 5: Slightly different PAN, but name matches closely enough",
+    "input": {
+      "pan_no": "ZZZZZ1111Z",
+      "gstin": null,
+      "name": "XYZ Enterprise"
+    }
+  }
+]
