@@ -23,9 +23,21 @@ export interface VerificationCheck {
 export interface DocumentScoreItem {
   id: string;
   name: string;
-  score: number; // out of 100
-  status: "verified" | "flagged";
+  score?: number | null; // out of 100, null if blacklisted or unrated
+  status: "verified" | "flagged" | "blacklisted" | "halted" | "pending";
   detail?: string;
+  isBlacklisted?: boolean;
+}
+
+export interface UploadedDocumentRecord {
+  id: string;
+  name: string;
+  size: number;
+  type?: string;
+  dataUrl?: string;
+  base64?: string;
+  uploadedAt?: string;
+  documentType?: string;
 }
 
 export interface Bidder {
@@ -34,7 +46,7 @@ export interface Bidder {
   gstin: string;
   score: number;
   risk: "Low" | "Medium" | "High";
-  status: "Under Verification" | "Verified" | "Rejected" | "Documents Requested" | "Cleared" | "Flagged" | "Under Review";
+  status: "Under Verification" | "Verified" | "Rejected" | "Documents Requested" | "Cleared" | "Flagged" | "Under Review" | "Blacklisted";
   pending: number;
   lastChecked: string;
   recommendation: string;
@@ -45,7 +57,9 @@ export interface Bidder {
   udyam?: string;
   pan?: string;
   attachedDocsCount?: number;
+  attachedDocuments?: UploadedDocumentRecord[];
   isAiVerified?: boolean;
+  isBlacklisted?: boolean;
   complianceScore?: number;
   documentScores?: DocumentScoreItem[];
 }
@@ -279,7 +293,7 @@ export function getEvaluatedBidders(tenderRef?: string): Bidder[] {
     let score = Math.max(20, baseBidder.score - scorePenalty);
     let pending = baseBidder.pending + tenderFlags;
     let risk: "Low" | "Medium" | "High" = baseBidder.risk;
-    let status: "Under Verification" | "Verified" | "Rejected" | "Documents Requested" | "Cleared" | "Flagged" | "Under Review" = baseBidder.status;
+    let status: Bidder["status"] = baseBidder.status;
     let recommendation = baseBidder.recommendation;
 
     if (tenderFlags > 0) {

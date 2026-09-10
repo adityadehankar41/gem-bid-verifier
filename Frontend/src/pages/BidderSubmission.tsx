@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { DocIcon, CheckIcon } from "../components/icons";
 import Footer from "../components/Footer";
 import { useBidderContext } from "../context/BidderContext";
+import { UploadedDocumentRecord } from "../data/bidders";
 
 const STEPS = ["Business Details", "Document Uploads", "Review & Submit"];
 
@@ -80,7 +81,9 @@ export default function BidderSubmission() {
     pan: false,
   });
 
-  const [files, setFiles] = useState<Record<string, { name: string; size: number }>>({});
+  const [files, setFiles] = useState<
+    Record<string, { name: string; size: number; type?: string; dataUrl?: string }>
+  >({});
 
   const errors = {
     companyName: touched.companyName ? validateCompanyName(formData.companyName) : null,
@@ -107,8 +110,17 @@ export default function BidderSubmission() {
     setTouched((t) => ({ ...t, [field]: true }));
   };
 
-  const setFile = (id: string, file: File) =>
-    setFiles((f) => ({ ...f, [id]: { name: file.name, size: file.size } }));
+  const setFile = (id: string, file: File) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const dataUrl = e.target?.result as string;
+      setFiles((f) => ({
+        ...f,
+        [id]: { name: file.name, size: file.size, type: file.type || "application/pdf", dataUrl },
+      }));
+    };
+    reader.readAsDataURL(file);
+  };
 
   const handleFillSample = () => {
     setFormData({
@@ -125,10 +137,30 @@ export default function BidderSubmission() {
       pan: true,
     });
     setFiles({
-      udyamCert: { name: "udyam_registration_cert.pdf", size: 345000 },
-      gstCert: { name: "gstn_33AAAAA0000A1Z5.pdf", size: 520000 },
-      panCard: { name: "pan_card_copy.pdf", size: 210000 },
-      itrProof: { name: "itr_ay_2025_26.pdf", size: 840000 },
+      udyamCert: {
+        name: "udyam_registration_cert.pdf",
+        size: 345000,
+        type: "application/pdf",
+        dataUrl: "data:application/pdf;base64,JVBERi0xLjQKJUlETVNNRS1TRUFMCg==",
+      },
+      gstCert: {
+        name: "gstn_33AAAAA0000A1Z5.pdf",
+        size: 520000,
+        type: "application/pdf",
+        dataUrl: "data:application/pdf;base64,JVBERi0xLjQKJUdTVF9SRVRVUk5TCg==",
+      },
+      panCard: {
+        name: "pan_card_copy.pdf",
+        size: 210000,
+        type: "application/pdf",
+        dataUrl: "data:application/pdf;base64,JVBERi0xLjQKJUNCQFRfUEFOCg==",
+      },
+      itrProof: {
+        name: "itr_ay_2025_26.pdf",
+        size: 840000,
+        type: "application/pdf",
+        dataUrl: "data:application/pdf;base64,JVBERi0xLjQKJUlUUl9FVkMK",
+      },
     });
   };
 
@@ -162,17 +194,28 @@ export default function BidderSubmission() {
     }
   };
 
-  // BACKEND INTEGRATION: Replace with POST /api/vendor/bids
-  // Transmits vendor credentials and attached statutory certificates.
+  // Transmits vendor credentials and attached statutory certificates to backend verification pipeline.
   // The newly created bid defaults to status "Under Verification" and queues on the Officer Dashboard.
   const handleFinalSubmit = () => {
     if (!formData.declaration) return;
+
+    const attachedDocuments: UploadedDocumentRecord[] = Object.entries(files).map(([docId, f]) => ({
+      id: docId,
+      name: f.name,
+      size: f.size,
+      type: f.type || "application/pdf",
+      dataUrl: f.dataUrl,
+      documentType: docId,
+      uploadedAt: new Date().toISOString(),
+    }));
+
     registerVendorBid({
       companyName: formData.companyName.trim(),
       udyam: formData.udyam.trim(),
       gstin: formData.gstin.trim(),
       pan: formData.pan.trim(),
       attachedDocs: Object.keys(files),
+      attachedDocuments,
     });
     handleClearForm();
     setActiveTab("pending");
@@ -271,10 +314,30 @@ export default function BidderSubmission() {
             setFile={setFile}
             onAttachDemoDocs={() => {
               setFiles({
-                udyamCert: { name: "udyam_registration_cert.pdf", size: 345000 },
-                gstCert: { name: "gstn_certificate_33.pdf", size: 520000 },
-                panCard: { name: "pan_card_copy.pdf", size: 210000 },
-                itrProof: { name: "itr_ay_2025_26.pdf", size: 840000 },
+                udyamCert: {
+                  name: "udyam_registration_cert.pdf",
+                  size: 345000,
+                  type: "application/pdf",
+                  dataUrl: "data:application/pdf;base64,JVBERi0xLjQKJUlETVNNRS1TRUFMCg==",
+                },
+                gstCert: {
+                  name: "gstn_certificate_33.pdf",
+                  size: 520000,
+                  type: "application/pdf",
+                  dataUrl: "data:application/pdf;base64,JVBERi0xLjQKJUdTVF9SRVRVUk5TCg==",
+                },
+                panCard: {
+                  name: "pan_card_copy.pdf",
+                  size: 210000,
+                  type: "application/pdf",
+                  dataUrl: "data:application/pdf;base64,JVBERi0xLjQKJUNCQFRfUEFOCg==",
+                },
+                itrProof: {
+                  name: "itr_ay_2025_26.pdf",
+                  size: 840000,
+                  type: "application/pdf",
+                  dataUrl: "data:application/pdf;base64,JVBERi0xLjQKJUlUUl9FVkMK",
+                },
               });
             }}
           />
