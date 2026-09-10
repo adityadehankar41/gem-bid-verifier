@@ -1,0 +1,9 @@
+@import "tailwindcss";
+
+body {
+  font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  color: #171E27;
+  background-color: #F7F6F2;
+  margin: 0;
+  padding: 0;
+}
