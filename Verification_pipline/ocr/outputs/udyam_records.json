@@ -1,0 +1,24 @@
+[
+    {
+        "file_name": "1677213703-3978640615.jpg",
+        "file_path": "C:\\Users\\dhruv\\Desktop\\OCR-Service-Merge\\test_images\\1677213703-3978640615.jpg",
+        "pages_processed": 1,
+        "document_type": "UDYAM_CERTIFICATE",
+        "name": "COLOURS SPA",
+        "identifiers": {
+            "Udyam": [
+                "UDYAM-GJ-22-0199736"
+            ],
+            "Income_Cert_No": [
+                "INCORPORATION",
+                "INDUSTRY"
+            ],
+            "Date": [
+                "15/11/2022"
+            ]
+        },
+        "extra_info": {
+            "enterprise_type": "Micro"
+        }
+    }
+]

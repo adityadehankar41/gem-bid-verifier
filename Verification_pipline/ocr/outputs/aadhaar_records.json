@@ -1,0 +1,36 @@
+[
+    {
+        "file_name": "20201015_214738-3324389238.png",
+        "file_path": "C:\\Users\\dhruv\\Desktop\\OCR-Service-Merge\\test_images\\20201015_214738-3324389238.png",
+        "pages_processed": 1,
+        "document_type": "AADHAAR_CARD",
+        "name": null,
+        "identifiers": {
+            "Aadhaar": [
+                "[Aadhaar Redacted]"
+            ],
+            "Date": [
+                "21/04/2003"
+            ]
+        },
+        "extra_info": {}
+    },
+    {
+        "file_name": "1-3589183742.jpg",
+        "file_path": "C:\\Users\\dhruv\\Desktop\\OCR-Service-Merge\\test_images\\1-3589183742.jpg",
+        "pages_processed": 1,
+        "document_type": "AADHAAR_CARD",
+        "name": null,
+        "identifiers": {
+            "Aadhaar": [
+                "[Aadhaar Redacted]",
+                "[Aadhaar Redacted]",
+                "[Aadhaar Redacted]"
+            ],
+            "Income_Cert_No": [
+                "INFORMATION"
+            ]
+        },
+        "extra_info": {}
+    }
+]

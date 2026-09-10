@@ -1,0 +1,10 @@
+# Image Processing & Computer Vision
+opencv-python>=4.8.0.76
+pillow>=10.0.0
+numpy>=1.24.0
+
+# OCR Engine Interface
+pytesseract>=0.3.10
+
+# Document & PDF Conversion
+pdf2image>=1.16.3
