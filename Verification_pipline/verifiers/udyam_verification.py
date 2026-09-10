@@ -8,13 +8,13 @@ REVIEW_THRESHOLD = 85
 
 
 def verify_udyam(extracted_data , mock_db):
-    reg_no = (extracted_data.get("reg_no") or "").strip().upper()
+    Udyam = (extracted_data.get("Udyam") or "").strip().upper()
     extracted_name = (extracted_data.get("entity_name") or "").strip()
     extracted_type = (extracted_data.get("enterprise_type") or "").strip()
 
     issues = []
     result = {
-        "reg_no" : reg_no,
+        "Udyam" : Udyam,
         "found_in_db" : None,
         "status" : None,
         "enterprise_type_on_record": None,
@@ -30,7 +30,7 @@ def verify_udyam(extracted_data , mock_db):
 
     # 1. DB lookup for udyam id 
 
-    record = mock_db.get(reg_no)
+    record = mock_db.get(Udyam)
     result["found_in_db"] = record is not None
 
     if record is None:
