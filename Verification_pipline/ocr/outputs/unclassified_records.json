@@ -1,0 +1,43 @@
+[
+    {
+        "file_name": "large-4291025719 (1).png",
+        "file_path": "C:\\Users\\dhruv\\Desktop\\OCR-Service-Merge\\test_images\\large-4291025719 (1).png",
+        "pages_processed": 1,
+        "document_type": "UNKNOWN_OR_GENERAL",
+        "name": null,
+        "identifiers": {
+            "Income_Cert_No": [
+                "INSTITUTE",
+                "application",
+                "INDUSTRIAL",
+                "Certificate",
+                "certificate"
+            ],
+            "Date": [
+                "14/08/2017",
+                "28/03/2008",
+                "01/03/2018"
+            ]
+        },
+        "extra_info": {}
+    },
+    {
+        "file_name": "OIP-2062854676.jpg",
+        "file_path": "C:\\Users\\dhruv\\Desktop\\OCR-Service-Merge\\test_images\\OIP-2062854676.jpg",
+        "pages_processed": 1,
+        "document_type": "UNKNOWN_OR_GENERAL",
+        "name": null,
+        "identifiers": {
+            "Income_Cert_No": [
+                "Incorporated/"
+            ],
+            "Income_Amount": [
+                "100"
+            ],
+            "Date": [
+                "06-07-2023"
+            ]
+        },
+        "extra_info": {}
+    }
+]

@@ -1,0 +1,20 @@
+[
+    {
+        "file_name": "test-image-4.png",
+        "file_path": "C:\\Users\\dhruv\\Desktop\\OCR-Service-Merge\\test_images\\test-image-4.png",
+        "pages_processed": 1,
+        "document_type": "PAN_CARD",
+        "name": "Ccomecesr Geyoey   usps ceerespr",
+        "identifiers": {
+            "pan_no": [
+                "AMNPG7909B"
+            ],
+            "Date": [
+                "14/09/1954"
+            ]
+        },
+        "extra_info": {
+            "father_name": "LEC ON tohpe    aE Ci Vb ore Be"
+        }
+    }
+]
