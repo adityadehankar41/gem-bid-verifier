@@ -22,7 +22,21 @@ export default function VerifiedBidders() {
   const [breakdownModalBidder, setBreakdownModalBidder] = useState<Bidder | null>(null);
 
   const allBidders = getAllBidders();
-  const verifiedBidders = allBidders.filter((b) => b.isAiVerified);
+  const verifiedBidders = allBidders.filter(
+    (b) =>
+      b.isAiVerified === true &&
+      !b.isBlacklisted &&
+      b.status !== "Rejected" &&
+      typeof b.complianceScore === "number" &&
+      Array.isArray(b.documentScores) &&
+      b.documentScores.length > 0 &&
+      !b.documentScores.some(
+        (d) =>
+          d.status === "blacklisted" ||
+          (d.status as string) === "black listed" ||
+          d.isBlacklisted
+      )
+  );
 
   const filtered = verifiedBidders.filter((b) =>
     b.name.toLowerCase().includes(search.toLowerCase())
@@ -400,8 +414,16 @@ export default function VerifiedBidders() {
                     <p className="font-semibold text-[#171E27]">{doc.name}</p>
                     {doc.detail && <p className="text-[11px] text-[#5B6B7D] mt-0.5">{doc.detail}</p>}
                   </div>
-                  <div className="px-2.5 py-1 rounded bg-white border border-[#BDE0D2] font-mono font-bold text-[#1F7A5C] text-xs">
-                    {doc.score} / 100
+                  <div>
+                    {doc.score !== null && typeof doc.score === "number" ? (
+                      <div className="px-2.5 py-1 rounded bg-white border border-[#BDE0D2] font-mono font-bold text-[#1F7A5C] text-xs">
+                        {doc.score} / 100
+                      </div>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#8A2525] text-white">
+                        Blacklisted
+                      </span>
+                    )}
                   </div>
                 </div>
               ))}

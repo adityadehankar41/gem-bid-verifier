@@ -1,5 +1,13 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { Bidder, Tender, TENDERS, BASE_BIDDERS, BIDDER_RAW_STATS } from "../data/bidders";
+import {
+  Bidder,
+  Tender,
+  TENDERS,
+  BASE_BIDDERS,
+  BIDDER_RAW_STATS,
+  UploadedDocumentRecord,
+  DocumentScoreItem,
+} from "../data/bidders";
 
 export interface SubmissionPayload {
   companyName: string;
@@ -14,12 +22,13 @@ export interface SubmissionPayload {
   localContent?: string;
   tenderRef?: string;
   attachedDocs: string[];
+  attachedDocuments?: UploadedDocumentRecord[];
 }
 
 export interface VerificationResult {
   score: number;
   risk: "Low" | "Medium" | "High";
-  status: "Under Verification" | "Verified" | "Rejected" | "Documents Requested" | "Cleared" | "Flagged" | "Under Review";
+  status: "Under Verification" | "Verified" | "Rejected" | "Documents Requested" | "Cleared" | "Flagged" | "Under Review" | "Blacklisted";
   pending: number;
   checks: {
     id: string;
@@ -41,11 +50,23 @@ interface BidderContextType {
   setSubmittedBidderId: (id: string | null) => void;
   evaluateSubmission: (payload: SubmissionPayload, tender?: Tender) => VerificationResult;
   registerSubmittedBidder: (payload: SubmissionPayload, result: VerificationResult) => Bidder;
-  registerVendorBid: (payload: { companyName: string; udyam: string; gstin: string; pan: string; attachedDocs: string[] }) => Bidder;
+  registerVendorBid: (payload: {
+    companyName: string;
+    udyam: string;
+    gstin: string;
+    pan: string;
+    attachedDocs: string[];
+    attachedDocuments?: UploadedDocumentRecord[];
+  }) => Bidder;
   completeAiVerification: (
     bidderId: string,
-    docScores: { id: string; name: string; score: number; status: "verified" | "flagged"; detail?: string }[],
+    docScores: DocumentScoreItem[],
     complianceScore: number
+  ) => void;
+  markBidderBlacklisted: (
+    bidderId: string,
+    docScores: DocumentScoreItem[],
+    reason?: string
   ) => void;
   updateBidderStatus: (
     bidderId: string,
@@ -66,7 +87,25 @@ export function BidderProvider({ children }: { children: React.ReactNode }) {
     const saved = sessionStorage.getItem("bidsure_custom_bidders");
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed: Bidder[] = JSON.parse(saved);
+        // Ensure any bidder without real completed backend documentScores is not marked isAiVerified
+        return parsed.map((b) => {
+          if (
+            b.isAiVerified &&
+            (!b.documentScores || b.documentScores.length === 0 || typeof b.complianceScore !== "number")
+          ) {
+            return {
+              ...b,
+              isAiVerified: false,
+              complianceScore: undefined,
+              documentScores: undefined,
+              score: 0,
+              status: "Under Verification" as const,
+              lastChecked: "Awaiting Backend Verification",
+            };
+          }
+          return b;
+        });
       } catch {
         return [];
       }
@@ -91,22 +130,46 @@ export function BidderProvider({ children }: { children: React.ReactNode }) {
   });
 
   useEffect(() => {
-    sessionStorage.setItem("bidsure_custom_bidders", JSON.stringify(customBidders));
+    try {
+      // Store lightweight custom bidder representation to avoid quota errors
+      const sanitized = customBidders.map((b) => ({
+        ...b,
+        attachedDocuments: b.attachedDocuments?.map((d) => ({
+          id: d.id,
+          name: d.name,
+          size: d.size,
+          type: d.type,
+          documentType: d.documentType,
+          uploadedAt: d.uploadedAt,
+        })),
+      }));
+      sessionStorage.setItem("bidsure_custom_bidders", JSON.stringify(sanitized));
+    } catch (e) {
+      console.warn("Storage quota reached or storage disabled:", e);
+    }
   }, [customBidders]);
 
   useEffect(() => {
-    if (submittedBidderId) {
-      sessionStorage.setItem("bidsure_submitted_bidder_id", submittedBidderId);
-    } else {
-      sessionStorage.removeItem("bidsure_submitted_bidder_id");
+    try {
+      if (submittedBidderId) {
+        sessionStorage.setItem("bidsure_submitted_bidder_id", submittedBidderId);
+      } else {
+        sessionStorage.removeItem("bidsure_submitted_bidder_id");
+      }
+    } catch {
+      // ignore
     }
   }, [submittedBidderId]);
 
   useEffect(() => {
-    if (lastSubmission) {
-      sessionStorage.setItem("bidsure_last_submission", JSON.stringify(lastSubmission));
-    } else {
-      sessionStorage.removeItem("bidsure_last_submission");
+    try {
+      if (lastSubmission) {
+        sessionStorage.setItem("bidsure_last_submission", JSON.stringify(lastSubmission));
+      } else {
+        sessionStorage.removeItem("bidsure_last_submission");
+      }
+    } catch {
+      // ignore
     }
   }, [lastSubmission]);
 
@@ -340,30 +403,39 @@ export function BidderProvider({ children }: { children: React.ReactNode }) {
     return newBidder;
   }
 
-  function registerVendorBid(payload: { companyName: string; udyam: string; gstin: string; pan: string; attachedDocs: string[] }): Bidder {
+  function registerVendorBid(payload: {
+    companyName: string;
+    udyam: string;
+    gstin: string;
+    pan: string;
+    attachedDocs: string[];
+    attachedDocuments?: UploadedDocumentRecord[];
+  }): Bidder {
     // Explicitly mark as not AI-verified so it lists in Officer Dashboard pending queue
     const newBidder: Bidder = {
       id: `bidder-${Date.now()}`,
       name: payload.companyName,
       gstin: payload.gstin,
-      score: 92,
+      score: 0,
       risk: "Low",
       status: "Under Verification",
       pending: 0,
-      lastChecked: "Awaiting Officer Verification",
-      recommendation: "Bid submitted by vendor. Statutory credentials ready for procurement officer verification.",
+      lastChecked: "Awaiting Backend Verification",
+      recommendation: "Bid submitted by vendor. Statutory credentials and certificates ready for backend verification pipeline.",
       isAiVerified: false,
+      complianceScore: undefined,
+      documentScores: undefined,
       officerDecision: null,
       submittedAt: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
       udyam: payload.udyam,
       pan: payload.pan,
       attachedDocsCount: payload.attachedDocs.length,
+      attachedDocuments: payload.attachedDocuments || [],
       checks: [
-        { label: "Udyam Registration", status: "verified", note: `Udyam ID ${payload.udyam} active on MSME registry.` },
-        { label: "GSTN Registration & Returns", status: "verified", note: `GSTIN ${payload.gstin} regular in GSTR-3B filings.` },
-        { label: "PAN & MCA21 Record", status: "verified", note: `PAN ${payload.pan} verified against CBDT master database.` },
-        { label: "Central Debarment / Incident Check", status: "verified", note: "No adverse debarment or vigilance record found." },
-        { label: "DigiLocker Authenticity", status: "verified", note: `${payload.attachedDocs.length} certificates cryptographically verified.` },
+        { label: "Udyam Registration", status: "verified", note: `Udyam ID ${payload.udyam} delivered in payload.` },
+        { label: "GSTN Registration & Returns", status: "verified", note: `GSTIN ${payload.gstin} delivered in payload.` },
+        { label: "PAN & MCA21 Record", status: "verified", note: `PAN ${payload.pan} delivered in payload.` },
+        { label: "DigiLocker / Attached Certificates", status: "verified", note: `${payload.attachedDocs.length} statutory files attached.` },
       ],
     };
 
@@ -375,9 +447,21 @@ export function BidderProvider({ children }: { children: React.ReactNode }) {
 
   function completeAiVerification(
     bidderId: string,
-    docScores: { id: string; name: string; score: number; status: "verified" | "flagged"; detail?: string }[],
+    docScores: DocumentScoreItem[],
     complianceScore: number
   ) {
+    if (!docScores || docScores.length === 0 || typeof complianceScore !== "number") {
+      return;
+    }
+
+    const hasBlacklist = docScores.some(
+      (d) => d.status === "blacklisted" || (d.status as string) === "black listed" || d.isBlacklisted
+    );
+    if (hasBlacklist) {
+      markBidderBlacklisted(bidderId, docScores);
+      return;
+    }
+
     setCustomBidders((prev) => {
       const existingIndex = prev.findIndex((b) => b.id === bidderId);
       if (existingIndex >= 0) {
@@ -385,10 +469,11 @@ export function BidderProvider({ children }: { children: React.ReactNode }) {
         updated[existingIndex] = {
           ...updated[existingIndex],
           isAiVerified: true,
+          isBlacklisted: false,
           complianceScore,
           documentScores: docScores,
           score: complianceScore,
-          lastChecked: "AI Verified just now",
+          lastChecked: "Backend Verified just now",
         };
         return updated;
       } else {
@@ -397,10 +482,61 @@ export function BidderProvider({ children }: { children: React.ReactNode }) {
         const updatedBidder: Bidder = {
           ...base,
           isAiVerified: true,
+          isBlacklisted: false,
           complianceScore,
           documentScores: docScores,
           score: complianceScore,
-          lastChecked: "AI Verified just now",
+          lastChecked: "Backend Verified just now",
+        };
+        return [updatedBidder, ...prev];
+      }
+    });
+  }
+
+  function markBidderBlacklisted(
+    bidderId: string,
+    docScores: DocumentScoreItem[],
+    reason?: string
+  ) {
+    const blacklistNotice =
+      reason ||
+      "Statutory verification halted: submitted document identified as Blacklisted on national registry.";
+
+    setCustomBidders((prev) => {
+      const existingIndex = prev.findIndex((b) => b.id === bidderId);
+      if (existingIndex >= 0) {
+        const updated = [...prev];
+        updated[existingIndex] = {
+          ...updated[existingIndex],
+          isAiVerified: false,
+          isBlacklisted: true,
+          status: "Rejected",
+          risk: "High",
+          score: 0,
+          complianceScore: undefined,
+          documentScores: docScores,
+          officerDecision: "Rejected",
+          lastChecked: "Blacklisted in Statutory Verification",
+          recommendation: `[Debarred Vendor] ${blacklistNotice}`,
+          feedbackMessage: blacklistNotice,
+        };
+        return updated;
+      } else {
+        const base = BASE_BIDDERS.find((b) => b.id === bidderId);
+        if (!base) return prev;
+        const updatedBidder: Bidder = {
+          ...base,
+          isAiVerified: false,
+          isBlacklisted: true,
+          status: "Rejected",
+          risk: "High",
+          score: 0,
+          complianceScore: undefined,
+          documentScores: docScores,
+          officerDecision: "Rejected",
+          lastChecked: "Blacklisted in Statutory Verification",
+          recommendation: `[Debarred Vendor] ${blacklistNotice}`,
+          feedbackMessage: blacklistNotice,
         };
         return [updatedBidder, ...prev];
       }
@@ -530,7 +666,7 @@ export function BidderProvider({ children }: { children: React.ReactNode }) {
       let score = Math.max(20, baseBidder.score - scorePenalty);
       let pending = baseBidder.pending + tenderFlags;
       let risk: "Low" | "Medium" | "High" = baseBidder.risk;
-      let status: "Under Verification" | "Verified" | "Rejected" | "Documents Requested" | "Cleared" | "Flagged" | "Under Review" = baseBidder.status;
+      let status: Bidder["status"] = baseBidder.status;
       let recommendation = baseBidder.recommendation;
 
       if (tenderFlags > 0) {
@@ -582,6 +718,7 @@ export function BidderProvider({ children }: { children: React.ReactNode }) {
         registerSubmittedBidder,
         registerVendorBid,
         completeAiVerification,
+        markBidderBlacklisted,
         updateBidderStatus,
         getBidderById,
         getAllBidders,
