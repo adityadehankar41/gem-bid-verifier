@@ -1,0 +1,84 @@
+[
+    {
+        "file_name": "1677213703-3978640615.jpg",
+        "file_path": "C:\\Users\\dhruv\\Desktop\\OCR-Service-Merge\\test_images\\1677213703-3978640615.jpg",
+        "pages_processed": 1,
+        "document_type": "UDYAM_CERTIFICATE",
+        "name": "COLOURS SPA",
+        "identifiers": {
+            "Udyam": [
+                "UDYAM-GJ-22-0199736"
+            ],
+            "Income_Cert_No": [
+                "INCORPORATION",
+                "INDUSTRY"
+            ],
+            "Date": [
+                "15/11/2022"
+            ]
+        },
+        "extra_info": {
+            "enterprise_type": "Micro"
+        }
+    },
+    {
+        "file_name": "udyam_bharat_msme.pdf",
+        "file_path": "test_images\\udyam_bharat_msme.pdf",
+        "pages_processed": 1,
+        "document_type": "UDYAM_CERTIFICATE",
+        "name": "Bharat MSME Traders",
+        "identifiers": {
+            "Udyam": [
+                "UDYAM-DL-01-2222222"
+            ]
+        },
+        "extra_info": {
+            "enterprise_type": "Micro"
+        }
+    },
+    {
+        "file_name": "udyam_sundaram_industrial.pdf",
+        "file_path": "test_images\\udyam_sundaram_industrial.pdf",
+        "pages_processed": 1,
+        "document_type": "UDYAM_CERTIFICATE",
+        "name": "Sundaram Industrial Equipments Pvt. Ltd.",
+        "identifiers": {
+            "Udyam": [
+                "UDYAM-TN-01-1111111"
+            ]
+        },
+        "extra_info": {
+            "enterprise_type": "Small"
+        }
+    },
+    {
+        "file_name": "udyam_coastal_epc.pdf",
+        "file_path": "test_images\\udyam_coastal_epc.pdf",
+        "pages_processed": 1,
+        "document_type": "UDYAM_CERTIFICATE",
+        "name": "Coastal EPC Solutions",
+        "identifiers": {
+            "Udyam": [
+                "UDYAM-KA-01-3333333"
+            ]
+        },
+        "extra_info": {
+            "enterprise_type": "Medium"
+        }
+    },
+    {
+        "file_name": "udyam_abc_traders.pdf",
+        "file_path": "test_images\\udyam_abc_traders.pdf",
+        "pages_processed": 1,
+        "document_type": "UDYAM_CERTIFICATE",
+        "name": "ABC Traders",
+        "identifiers": {
+            "Udyam": [
+                "UDYAM-MH-03-1234567"
+            ]
+        },
+        "extra_info": {
+            "enterprise_type": "Small"
+        }
+    }
+]

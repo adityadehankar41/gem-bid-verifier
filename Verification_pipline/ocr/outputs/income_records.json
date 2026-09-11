@@ -1,0 +1,18 @@
+[
+    {
+        "file_name": "1-269886851.jpg",
+        "file_path": "C:\\Users\\dhruv\\Desktop\\OCR-Service-Merge\\test_images\\1-269886851.jpg",
+        "pages_processed": 1,
+        "document_type": "INCOME_CERTIFICATE",
+        "name": null,
+        "identifiers": {
+            "Income_Cert_No": [
+                "CERTIFICATE"
+            ],
+            "Income_Amount": [
+                "7"
+            ]
+        },
+        "extra_info": {}
+    }
+]
