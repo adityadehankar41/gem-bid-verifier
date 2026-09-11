@@ -8,10 +8,9 @@ import { UploadedDocumentRecord } from "../data/bidders";
 const STEPS = ["Business Details", "Document Uploads", "Review & Submit"];
 
 const BASE_DOCS = [
-  { id: "udyamCert", label: "Udyam Registration Certificate (PDF)" },
-  { id: "gstCert", label: "GST Registration Certificate & Latest GSTR-3B" },
   { id: "panCard", label: "PAN Card of Entity / Authorized Signatory" },
-  { id: "itrProof", label: "Income Tax Returns Acknowledgement (AY 2025-26)" },
+  { id: "gstCert", label: "GST Registration Certificate & Latest GSTR-3B" },
+  { id: "udyamCert", label: "Udyam Registration Certificate (PDF)" },
 ];
 
 // Validation helper functions
@@ -154,12 +153,6 @@ export default function BidderSubmission() {
         size: 210000,
         type: "application/pdf",
         dataUrl: "data:application/pdf;base64,JVBERi0xLjQKJUNCQFRfUEFOCg==",
-      },
-      itrProof: {
-        name: "itr_ay_2025_26.pdf",
-        size: 840000,
-        type: "application/pdf",
-        dataUrl: "data:application/pdf;base64,JVBERi0xLjQKJUlUUl9FVkMK",
       },
     });
   };
@@ -331,12 +324,6 @@ export default function BidderSubmission() {
                   size: 210000,
                   type: "application/pdf",
                   dataUrl: "data:application/pdf;base64,JVBERi0xLjQKJUNCQFRfUEFOCg==",
-                },
-                itrProof: {
-                  name: "itr_ay_2025_26.pdf",
-                  size: 840000,
-                  type: "application/pdf",
-                  dataUrl: "data:application/pdf;base64,JVBERi0xLjQKJUlUUl9FVkMK",
                 },
               });
             }}

@@ -1,0 +1,42 @@
+{
+    "ABCDE1234F": {
+        "name": "ABC Traders",
+        "status": "Valid",
+        "aadhaar_linked": true
+    },
+    "PQRSX5678K": {
+        "name": "XYZ Enterprises",
+        "status": "Inoperative",
+        "aadhaar_linked": false
+    },
+    "LMNOP9012Q": {
+        "name": "Fake Traders Pvt Ltd",
+        "status": "Valid",
+        "aadhaar_linked": true
+    },
+    "DDDDD3333D": {
+        "name": "Vikram Safety Systems",
+        "status": "Valid",
+        "aadhaar_linked": true
+    },
+    "EEEEE4444E": {
+        "name": "NovaTech OEM Partners",
+        "status": "Inoperative",
+        "aadhaar_linked": false
+    },
+    "BBBBB1111B": {
+        "name": "Bharat MSME Traders",
+        "status": "Valid",
+        "aadhaar_linked": true
+    },
+    "AAAAA0000A": {
+        "name": "Sundaram Industrial Equipments Pvt. Ltd.",
+        "status": "Valid",
+        "aadhaar_linked": true
+    },
+    "CCCCC2222C": {
+        "name": "Coastal EPC Solutions",
+        "status": "Inoperative",
+        "aadhaar_linked": false
+    }
+}

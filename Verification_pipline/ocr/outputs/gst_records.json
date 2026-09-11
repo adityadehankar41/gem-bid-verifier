@@ -1,0 +1,62 @@
+[
+    {
+        "file_name": "gst_bharat_msme.pdf",
+        "file_path": "test_images\\gst_bharat_msme.pdf",
+        "pages_processed": 1,
+        "document_type": "GST_CERTIFICATE",
+        "name": "Bharat MSME Traders",
+        "identifiers": {
+            "GSTIN": [
+                "07BBBBB1111B2Z6"
+            ]
+        },
+        "extra_info": {
+            "registration_status": "Active"
+        }
+    },
+    {
+        "file_name": "gst_sundaram_industrial.pdf",
+        "file_path": "test_images\\gst_sundaram_industrial.pdf",
+        "pages_processed": 1,
+        "document_type": "GST_CERTIFICATE",
+        "name": "Sundaram Industrial Equipments Pvt. Ltd.",
+        "identifiers": {
+            "GSTIN": [
+                "33AAAAA0000A1Z5"
+            ]
+        },
+        "extra_info": {
+            "registration_status": "Active"
+        }
+    },
+    {
+        "file_name": "gst_coastal_epc.pdf",
+        "file_path": "test_images\\gst_coastal_epc.pdf",
+        "pages_processed": 1,
+        "document_type": "GST_CERTIFICATE",
+        "name": "Coastal EPC Solutions",
+        "identifiers": {
+            "GSTIN": [
+                "29CCCCC2222C3Z7"
+            ]
+        },
+        "extra_info": {
+            "registration_status": "Active"
+        }
+    },
+    {
+        "file_name": "gst_abc_traders.pdf",
+        "file_path": "test_images\\gst_abc_traders.pdf",
+        "pages_processed": 1,
+        "document_type": "GST_CERTIFICATE",
+        "name": "ABC Traders",
+        "identifiers": {
+            "GSTIN": [
+                "27ABCPT1234F1Z5"
+            ]
+        },
+        "extra_info": {
+            "registration_status": "Active"
+        }
+    }
+]

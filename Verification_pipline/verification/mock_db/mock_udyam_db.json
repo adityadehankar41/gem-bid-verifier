@@ -1,0 +1,44 @@
+{
+  "UDYAM-MH-03-1234567": {
+    "entity_name": "ABC Traders",
+    "enterprise_type": "Small",
+    "major_activity": "Trading",
+    "registration_date": "2021-04-15",
+    "status": "Active"
+  },
+  "UDYAM-KA-01-9876543": {
+    "entity_name": "XYZ Enterprises",
+    "enterprise_type": "Micro",
+    "major_activity": "Manufacturing",
+    "registration_date": "2019-11-02",
+    "status": "Cancelled"
+  },
+  "UDYAM-DL-02-5555555": {
+    "entity_name": "Sunrise Industries",
+    "enterprise_type": "Medium",
+    "major_activity": "Manufacturing",
+    "registration_date": "2020-01-10",
+    "status": "Active"
+  },
+  "UDYAM-DL-01-2222222": {
+    "entity_name": "Bharat MSME Traders",
+    "enterprise_type": "Micro",
+    "major_activity": "Trading",
+    "registration_date": "2022-03-20",
+    "status": "Active"
+  },
+  "UDYAM-TN-01-1111111": {
+    "entity_name": "Sundaram Industrial Equipments Pvt. Ltd.",
+    "enterprise_type": "Small",
+    "major_activity": "Manufacturing",
+    "registration_date": "2021-06-12",
+    "status": "Active"
+  },
+  "UDYAM-KA-01-3333333": {
+    "entity_name": "Coastal EPC Solutions",
+    "enterprise_type": "Medium",
+    "major_activity": "Engineering",
+    "registration_date": "2020-08-14",
+    "status": "Active"
+  }
+}

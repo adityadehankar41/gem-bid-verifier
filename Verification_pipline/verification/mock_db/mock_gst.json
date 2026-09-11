@@ -1,0 +1,58 @@
+{
+    "27ABCPT1234F1Z5": {
+        "legal_name": "ABC Traders",
+        "trade_name": "ABC Traders",
+        "registration_status": "Active",
+        "taxpayer_type": "Regular",
+        "returns_filed_last_4_quarters": 4
+    },
+    "29PQRSX5678K1Z3": {
+        "legal_name": "XYZ Enterprises",
+        "trade_name": "XYZ Ent.",
+        "registration_status": "Active",
+        "taxpayer_type": "Regular",
+        "returns_filed_last_4_quarters": 2
+    },
+    "07LMNOC9012Q1Z8": {
+        "legal_name": "Fake Traders Pvt Ltd",
+        "trade_name": "Fake Traders",
+        "registration_status": "Cancelled",
+        "taxpayer_type": "Regular",
+        "returns_filed_last_4_quarters": 0
+    },
+    "24DDDDD3333D4Z8": {
+        "legal_name": "Vikram Safety Systems",
+        "trade_name": "Vikram Safety",
+        "registration_status": "Active",
+        "taxpayer_type": "Regular",
+        "returns_filed_last_4_quarters": 4
+    },
+    "19EEEEE4444E5Z9": {
+        "legal_name": "NovaTech OEM Partners",
+        "trade_name": "NovaTech",
+        "registration_status": "Active",
+        "taxpayer_type": "Regular",
+        "returns_filed_last_4_quarters": 3
+    },
+    "33AAAAA0000A1Z5": {
+        "legal_name": "Sundaram Industrial Equipments Pvt. Ltd.",
+        "trade_name": "Sundaram Equipments",
+        "registration_status": "Active",
+        "taxpayer_type": "Regular",
+        "returns_filed_last_4_quarters": 4
+    },
+    "07BBBBB1111B2Z6": {
+        "legal_name": "Bharat MSME Traders",
+        "trade_name": "Bharat MSME Traders",
+        "registration_status": "Active",
+        "taxpayer_type": "Regular",
+        "returns_filed_last_4_quarters": 4
+    },
+    "29CCCCC2222C3Z7": {
+        "legal_name": "Coastal EPC Solutions",
+        "trade_name": "Coastal EPC",
+        "registration_status": "Active",
+        "taxpayer_type": "Regular",
+        "returns_filed_last_4_quarters": 2
+    }
+}

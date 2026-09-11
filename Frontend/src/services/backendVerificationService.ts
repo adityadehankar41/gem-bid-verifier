@@ -14,6 +14,12 @@ export interface BackendVerificationResponse {
   summary?: string;
   engine?: string;
   receivedDocumentsCount?: number;
+  // Prompt-standardized fields
+  blocked?: boolean;
+  overall_status?: "COMPLIANT" | "NEEDS_REVIEW" | "BLOCKED" | "NON_COMPLIANT" | string;
+  overall_score?: number | null;
+  reason?: string;
+  documents?: Record<string, { status: string; score?: number; verdict?: string; issues?: string[] }>;
 }
 
 /**
@@ -21,9 +27,9 @@ export interface BackendVerificationResponse {
  */
 export const STATUTORY_DOCUMENT_SPECS = [
   {
-    id: "udyamCert",
-    name: "Udyam Registration Certificate (PDF)",
-    defaultDetail: "MSME classification verified on national MSME registry.",
+    id: "panCard",
+    name: "PAN Card of Entity / Authorized Signatory",
+    defaultDetail: "Matched with CBDT master database and MCA21 incorporation records.",
   },
   {
     id: "gstCert",
@@ -31,19 +37,14 @@ export const STATUTORY_DOCUMENT_SPECS = [
     defaultDetail: "Active GSTIN with regular return filings verified on GSTN API Gateway.",
   },
   {
-    id: "panCard",
-    name: "PAN Card of Entity / Authorized Signatory",
-    defaultDetail: "Matched with CBDT master database and MCA21 incorporation records.",
-  },
-  {
-    id: "itrProof",
-    name: "Income Tax Returns Acknowledgement (AY 2025-26)",
-    defaultDetail: "Verified electronic verification code (EVC) and statutory turnover compliance.",
+    id: "udyamCert",
+    name: "Udyam Registration Certificate (PDF)",
+    defaultDetail: "MSME classification verified on national MSME registry.",
   },
 ];
 
 /**
- * Sends the bidder information and attached documents to the backend verification API.
+ * Sends the bidder information and attached documents to the FastAPI verification endpoint.
  */
 export async function performBackendDocumentVerification(
   bidder: Bidder
@@ -57,8 +58,10 @@ export async function performBackendDocumentVerification(
     documents: bidder?.attachedDocuments || [],
   };
 
+  const API_URL = "/api/verification/run";
+
   try {
-    const response = await fetch("/api/verify-documents", {
+    const response = await fetch(API_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -78,7 +81,19 @@ export async function performBackendDocumentVerification(
     }
 
     const data: BackendVerificationResponse = await response.json();
-    return data;
+
+    // Map standardized response fields
+    const isBlocked = data.blocked === true || data.overall_status === "BLOCKED" || data.isBlacklisted === true;
+    const finalScore = typeof data.overall_score === "number" ? data.overall_score : data.complianceScore;
+    const finalStatus = isBlocked ? "blacklisted" : (data.overall_status === "COMPLIANT" ? "verified" : (data.status || "flagged"));
+
+    return {
+      ...data,
+      isBlacklisted: isBlocked,
+      blacklistedReason: isBlocked ? (data.reason || data.blacklistedReason || "Bidder found on national statutory blacklist registry.") : undefined,
+      complianceScore: finalScore,
+      status: finalStatus,
+    };
   } catch (err: any) {
     return {
       bidderId: bidder?.id || "",
@@ -90,3 +105,4 @@ export async function performBackendDocumentVerification(
     };
   }
 }
+

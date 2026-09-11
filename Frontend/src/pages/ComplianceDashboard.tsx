@@ -249,8 +249,8 @@ function AIVerificationScreen({
         detail: existing
           ? existing.detail || spec.defaultDetail
           : attachedDoc
-          ? `Uploaded document "${attachedDoc.name}" (${(attachedDoc.size / 1024).toFixed(0)} KB). Packaged in backend payload.`
-          : spec.defaultDetail,
+            ? `Uploaded document "${attachedDoc.name}" (${(attachedDoc.size / 1024).toFixed(0)} KB). Packaged in backend payload.`
+            : spec.defaultDetail,
         isBlacklisted: existing?.isBlacklisted || existingStatus === "blacklisted",
       };
     })
@@ -408,12 +408,12 @@ function AIVerificationScreen({
       backendScores && backendScores.length > 0
         ? backendScores
         : docScores.map((d) => ({
-            id: d.id,
-            name: d.name,
-            score: null,
-            status: d.status as any,
-            detail: d.detail,
-          }));
+          id: d.id,
+          name: d.name,
+          score: null,
+          status: d.status as any,
+          detail: d.detail,
+        }));
     onBlacklist(scoresToRecord, blacklistedReason || "Debarred in statutory document verification.");
   };
 
@@ -462,7 +462,7 @@ function AIVerificationScreen({
             </div>
             <p className="text-[11px] mb-1">{backendMessage}</p>
             <p className="text-[11px] text-[#8A96A3]">
-              Endpoint: <code className="bg-[#EDEAE1] px-1 py-0.5 rounded text-[#171E27]">POST /api/verify-documents</code>
+              Endpoint: <code className="bg-[#EDEAE1] px-1 py-0.5 rounded text-[#171E27]">POST /api/verification/run</code>
             </p>
           </div>
         )}
@@ -497,13 +497,13 @@ function AIVerificationScreen({
                   backgroundColor: isDocBlacklisted
                     ? "#FDF3F3"
                     : isDocHalted
-                    ? "#FAF9F6"
-                    : "#FAF9F6",
+                      ? "#FAF9F6"
+                      : "#FAF9F6",
                   border: isDocBlacklisted
                     ? "1.5px solid #F0B8B8"
                     : isDocHalted
-                    ? "1px dashed #DCD7CB"
-                    : "1px solid #EDEAE1",
+                      ? "1px dashed #DCD7CB"
+                      : "1px solid #EDEAE1",
                   opacity: isDocHalted ? 0.65 : 1,
                 }}
               >
@@ -514,8 +514,8 @@ function AIVerificationScreen({
                       backgroundColor: isDocBlacklisted
                         ? "#8A2525"
                         : isDocHalted
-                        ? "#EDEAE1"
-                        : "#EEF5F1",
+                          ? "#EDEAE1"
+                          : "#EEF5F1",
                       color: isDocBlacklisted ? "#FFFFFF" : isDocHalted ? "#8A96A3" : "#1F7A5C",
                     }}
                   >
@@ -585,12 +585,32 @@ function AIVerificationScreen({
             </p>
           </div>
         ) : isCompleted && backendScores ? (
-          <div className="p-4 rounded bg-[#EEF5F1] border border-[#BDE0D2] text-center mb-6">
-            <span className="text-[11px] uppercase font-bold text-[#1F7A5C] tracking-wider block mb-1">
-              Backend Verification Complete
+          <div
+            className="p-4 rounded text-center mb-6"
+            style={{
+              backgroundColor: backendAvgScore >= 85 ? "#EEF5F1" : backendAvgScore >= 60 ? "#FBF1E4" : "#FDF3F3",
+              border: backendAvgScore >= 85 ? "1px solid #BDE0D2" : backendAvgScore >= 60 ? "1px solid #ECD9BF" : "1px solid #F0B8B8",
+            }}
+          >
+            <span
+              className="text-[11px] uppercase font-bold tracking-wider block mb-1"
+              style={{
+                color: backendAvgScore >= 85 ? "#1F7A5C" : backendAvgScore >= 60 ? "#95601F" : "#8A2525",
+              }}
+            >
+              {backendAvgScore >= 85
+                ? "Backend Verification: Compliant"
+                : backendAvgScore >= 60
+                  ? "Backend Verification: Needs Review"
+                  : "Backend Verification: Non-Compliant"}
             </span>
             <div className="flex items-center justify-center gap-2 mb-1">
-              <span className="text-3xl font-bold font-mono text-[#171E27]">
+              <span
+                className="text-3xl font-bold font-mono"
+                style={{
+                  color: backendAvgScore >= 85 ? "#171E27" : backendAvgScore >= 60 ? "#95601F" : "#8A2525",
+                }}
+              >
                 {backendAvgScore}
               </span>
               <span className="text-sm font-semibold text-[#5B6B7D]">/ 100</span>

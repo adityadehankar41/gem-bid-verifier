@@ -1,7 +1,7 @@
 [
     {
         "file_name": "test-image-4.png",
-        "file_path": "C:\\Users\\dhruv\\Desktop\\OCR-Service-Merge\\test_images\\test-image-4.png",
+        "file_path": "test_images\\test-image-4.png",
         "pages_processed": 1,
         "document_type": "PAN_CARD",
         "name": "Ccomecesr Geyoey   usps ceerespr",
@@ -16,5 +16,57 @@
         "extra_info": {
             "father_name": "LEC ON tohpe    aE Ci Vb ore Be"
         }
+    },
+    {
+        "file_name": "pan_bharat_msme.pdf",
+        "file_path": "test_images\\pan_bharat_msme.pdf",
+        "pages_processed": 1,
+        "document_type": "PAN_CARD",
+        "name": "Bharat MSME Traders",
+        "identifiers": {
+            "pan_no": [
+                "BBBBB1111B"
+            ]
+        },
+        "extra_info": {}
+    },
+    {
+        "file_name": "pan_sundaram_industrial.pdf",
+        "file_path": "test_images\\pan_sundaram_industrial.pdf",
+        "pages_processed": 1,
+        "document_type": "PAN_CARD",
+        "name": "Sundaram Industrial Equipments Pvt. Ltd.",
+        "identifiers": {
+            "pan_no": [
+                "AAAAA0000A"
+            ]
+        },
+        "extra_info": {}
+    },
+    {
+        "file_name": "pan_coastal_epc.pdf",
+        "file_path": "test_images\\pan_coastal_epc.pdf",
+        "pages_processed": 1,
+        "document_type": "PAN_CARD",
+        "name": "Coastal EPC Solutions",
+        "identifiers": {
+            "pan_no": [
+                "CCCCC2222C"
+            ]
+        },
+        "extra_info": {}
+    },
+    {
+        "file_name": "pan_abc_traders.pdf",
+        "file_path": "test_images\\pan_abc_traders.pdf",
+        "pages_processed": 1,
+        "document_type": "PAN_CARD",
+        "name": "ABC Traders",
+        "identifiers": {
+            "pan_no": [
+                "ABCDE1234F"
+            ]
+        },
+        "extra_info": {}
     }
 ]
